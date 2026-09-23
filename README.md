@@ -35,3 +35,8 @@ Support operations is the starting point. The same architectural foundation can 
 ## Status
 
 Early development.
+
+
+И не забудь: при новом открытии терминала активировать окружение:
+
+source .venv/bin/activate
