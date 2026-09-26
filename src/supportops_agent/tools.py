@@ -24,6 +24,19 @@ _ORDERS: dict[str, OrderRecord] = {
     ),
 }
 
+CUSTOMERS = {
+    "customer_001": {
+        "customer_id": "customer_001",
+        "name": "John",
+        "email": "john@example.com",
+    },
+    "customer_002": {
+        "customer_id": "customer_002",
+        "name": "Alice",
+        "email": "alice@example.com",
+    },
+}
+
 
 def lookup_order(order_id: str) -> OrderRecord | None:
     """Return an order by ID, or None when the order does not exist."""
@@ -34,3 +47,6 @@ def lookup_order(order_id: str) -> OrderRecord | None:
         raise ValueError("order_id must not be empty")
 
     return _ORDERS.get(normalized_order_id)
+
+def lookup_customer(customer_id: str):
+    return CUSTOMERS.get(customer_id)

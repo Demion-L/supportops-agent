@@ -14,7 +14,7 @@ agent = SupportAgent(client)
 ticket = SupportTicket(
     ticket_id="ticket_001",
     customer_id="customer_001",
-    message="Where is my order order_001?"
+    message="What is the email address of customer_001?"
 )
 
 answer = agent.run(ticket)
