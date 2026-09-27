@@ -7,6 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from supportops_agent.tools import lookup_customer, lookup_order
 
 
+TOOL_REGISTRY = {
+    "lookup_order": lookup_order,
+    "lookup_customer": lookup_customer,
+}
+
+
 class LookupOrderArguments(BaseModel):
     """Validated arguments for the lookup_order tool."""
 
@@ -52,22 +58,21 @@ class ToolResult(BaseModel):
 def execute_tool_call(call: ToolCall) -> ToolResult:
     """Execute a validated tool call and return its structured result."""
 
-    if call.name == "lookup_order":
-        order = lookup_order(call.arguments.order_id)
+    tool = TOOL_REGISTRY.get(call.name)
 
-        return ToolResult(
-            call_id=call.call_id,
-            name=call.name,
-            output=order.model_dump(mode="json") if order else None,
-        )
+    if tool is None:
+        raise ValueError(f"Unknown tool: {call.name}")
+       
+    arguments = call.arguments.model_dump()
+    result = tool(**arguments)
 
-    if call.name == "lookup_customer":
-        customer = lookup_customer(call.arguments.customer_id)
+    if hasattr(result, "model_dump"):
+        output = result.model_dump(mode="json")
+    else:
+        output = result
 
-        return ToolResult(
-            call_id=call.call_id,
-            name=call.name,
-            output=customer,
-        )
-
-    raise ValueError(f"Unknown tool: {call.name}")
+    return ToolResult(
+        call_id=call.call_id,
+        name=call.name,
+        output=output,
+    )
