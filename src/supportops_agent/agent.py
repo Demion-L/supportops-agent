@@ -73,17 +73,22 @@ class SupportAgent:
             tool_outputs = []
 
             for item in function_calls:
+
                 tool_result = self.execute_function_call(item)
 
                 print("Tool result:", tool_result)
 
-                tool_outputs.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": tool_result.call_id,
-                        "output": str(tool_result.output),
-                    }
-                )
+                tool_output = {
+                    "type": "function_call_output",
+                    "call_id": tool_result.call_id,
+                    "output": (
+                        str(tool_result.output)
+                        if tool_result.error is None
+                        else f"Tool execution error: {tool_result.error}"
+                    ),
+                }
+
+                tool_outputs.append(tool_output)
 
             response = self.client.responses.create(
                 model="gpt-4.1-mini",

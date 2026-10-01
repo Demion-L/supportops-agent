@@ -48,5 +48,12 @@ def lookup_order(order_id: str) -> OrderRecord | None:
 
     return _ORDERS.get(normalized_order_id)
 
-def lookup_customer(customer_id: str):
-    return CUSTOMERS.get(customer_id)
+def lookup_customer(customer_id: str) -> dict[str, str] | None:
+    """Return a customer by ID, or None when the customer does not exist."""
+
+    normalized_customer_id = customer_id.strip()
+
+    if not normalized_customer_id:
+        raise ValueError("customer_id must not be empty")
+
+    return CUSTOMERS.get(normalized_customer_id)

@@ -52,7 +52,10 @@ class ToolResult(BaseModel):
 
     call_id: str
     name: Literal["lookup_order", "lookup_customer"]
-    output: dict[str, object] | None
+    output: dict[str, object] | None = None
+    error: str | None = None
+
+    
 
 
 def execute_tool_call(call: ToolCall) -> ToolResult:
@@ -64,7 +67,15 @@ def execute_tool_call(call: ToolCall) -> ToolResult:
         raise ValueError(f"Unknown tool: {call.name}")
        
     arguments = call.arguments.model_dump()
-    result = tool(**arguments)
+
+    try:
+        result = tool(**arguments)
+    except Exception as exc:
+        return ToolResult(
+            call_id=call.call_id,
+            name=call.name,
+            error=f"Tool '{call.name}' failed: {exc}",
+    )
 
     if hasattr(result, "model_dump"):
         output = result.model_dump(mode="json")

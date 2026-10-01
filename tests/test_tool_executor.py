@@ -1,4 +1,11 @@
-from supportops_agent.tool_executor import ToolCall, execute_tool_call
+import pytest
+from pydantic import ValidationError
+
+from supportops_agent.tool_executor import (
+    ToolCall,
+    execute_tool_call,
+     TOOL_REGISTRY,
+)
 
 
 def test_execute_lookup_customer():
@@ -38,3 +45,53 @@ def test_execute_lookup_order():
         "currency": "EUR",
         "created_at": "2026-07-20",
     }
+
+
+def test_lookup_customer_rejects_empty_customer_id():
+
+    with pytest.raises(ValidationError):
+        ToolCall(
+            call_id="test_invalid",
+            name="lookup_customer",
+            arguments={"customer_id": ""},
+        )
+
+
+def test_lookup_order_returns_none_for_unknown_order():
+    call = ToolCall(
+        call_id="test_unknown_order",
+        name="lookup_order",
+        arguments={"order_id": "order_999"},
+    )
+
+    result = execute_tool_call(call)
+
+    assert result.call_id == "test_unknown_order"
+    assert result.name == "lookup_order"
+    assert result.output is None
+
+
+def test_tool_execution_error_is_returned_as_result(monkeypatch):
+    def failing_tool(order_id: str):
+        raise RuntimeError("database connection failed")
+
+    monkeypatch.setitem(
+        TOOL_REGISTRY,
+        "lookup_order",
+        failing_tool,
+    )
+
+    call = ToolCall(
+        call_id="test_failing_order",
+        name="lookup_order",
+        arguments={"order_id": "order_001"},
+    )
+
+    result = execute_tool_call(call)
+
+    assert result.call_id == "test_failing_order"
+    assert result.name == "lookup_order"
+    assert result.output is None
+    assert result.error == (
+        "Tool 'lookup_order' failed: database connection failed"
+    )
