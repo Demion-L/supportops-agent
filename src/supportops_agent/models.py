@@ -1,6 +1,6 @@
 """Data models used by SupportOps Agent."""
 
-from datetime import datetime
+from datetime import UTC, datetime, date
 from enum import StrEnum
 from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
@@ -44,7 +44,7 @@ class OrderRecord(BaseModel):
     status: OrderStatus
     amount_cents: int = Field(gt=0)
     currency: str = Field(pattern=r"^[A-Z]{3}$")
-    created_at: datetime
+    created_at: date
 
 
 class AgentStep(BaseModel):
@@ -56,7 +56,7 @@ class AgentStep(BaseModel):
     input: dict[str, object] | None = None
     output: dict[str, object] | None = None
     error: str | None = None
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
 
 
@@ -66,5 +66,5 @@ class AgentRun(BaseModel):
     run_id: str = Field(default_factory=lambda: str(uuid4()))
     ticket_id: str
     steps: list[AgentStep] = Field(default_factory=list)
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None

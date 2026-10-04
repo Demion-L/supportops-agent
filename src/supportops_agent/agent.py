@@ -1,6 +1,6 @@
 from openai import OpenAI
 import json
-from .models import SupportTicket
+from .models import SupportTicket, AgentRun, AgentStep
 from .tool_executor import ToolCall, ToolResult, execute_tool_call
 from supportops_agent.tool_definitions import LOOKUP_ORDER_TOOL,\
 LOOKUP_CUSTOMER_TOOL
@@ -11,6 +11,7 @@ MAX_AGENT_STEPS = 10
 class SupportAgent:
     def __init__(self, client: OpenAI):
         self.client = client
+        self.last_run: AgentRun | None = None
 
     def execute_function_call(self, item) -> object:
         tool_call = ToolCall(
@@ -37,10 +38,27 @@ class SupportAgent:
         }
 
     def run(self, ticket: SupportTicket) -> str:
+        self.last_run = AgentRun(
+            ticket_id=ticket.ticket_id,
+        )
+
         response = self.client.responses.create(
             model="gpt-4.1-mini",
             input=ticket.message,
             tools=[LOOKUP_ORDER_TOOL, LOOKUP_CUSTOMER_TOOL],
+        )
+
+        self.last_run.steps.append(
+            AgentStep(
+                step_number=1,
+                step_type="llm_call",
+                input={
+                    "message": ticket.message,
+                },
+                output={
+                    "response_id": response.id,
+                },
+            )
         )
 
         for step in range(MAX_AGENT_STEPS):
@@ -51,7 +69,19 @@ class SupportAgent:
             ]
 
             if not function_calls:
+                self.last_run.steps.append(
+                    AgentStep(
+                        step_number=len(self.last_run.steps) + 1,
+                        step_type="final",
+                        input=None,
+                        output={
+                            "answer": response.output_text,
+                        },
+                    )
+                )
+
                 return response.output_text
+
 
             tool_outputs = []
 
@@ -59,7 +89,19 @@ class SupportAgent:
 
                 tool_result = self.execute_function_call(item)
 
-                print("Tool result:", tool_result)
+                self.last_run.steps.append(
+                    AgentStep(
+                        step_number=len(self.last_run.steps) + 1,
+                        step_type="tool_execution",
+                        input={
+                            "call_id": item.call_id,
+                            "tool": item.name,
+                            "arguments": json.loads(item.arguments),
+                        },
+                        output=tool_result.output,
+                        error=tool_result.error,
+                    )
+                )
 
                 tool_outputs.append(
                     self.build_tool_output(tool_result)
@@ -69,6 +111,19 @@ class SupportAgent:
                 model="gpt-4.1-mini",
                 previous_response_id=response.id,
                 input=tool_outputs,
+            )
+
+            self.last_run.steps.append(
+                AgentStep(
+                    step_number=len(self.last_run.steps) + 1,
+                    step_type="llm_call",
+                    input={
+                        "tool_outputs": tool_outputs,
+                    },
+                    output={
+                        "response_id": response.id,
+                    },
+                )
             )
 
         raise RuntimeError(

@@ -202,3 +202,88 @@ def test_build_tool_output_for_error():
         ),
     }
 
+
+def test_agent_creates_execution_trace():
+    client = FakeOpenAI()
+    agent = SupportAgent(client)
+
+    ticket = SupportTicket(
+        ticket_id="ticket_001",
+        customer_id="customer_001",
+        message="Where is my order order_001?",
+    )
+
+    agent.run(ticket)
+
+    assert agent.last_run is not None
+    assert agent.last_run.ticket_id == "ticket_001"
+
+    assert len(agent.last_run.steps) == 4
+
+    llm_step = agent.last_run.steps[0]
+
+    assert llm_step.step_number == 1
+    assert llm_step.step_type == "llm_call"
+    assert llm_step.input == {
+        "message": "Where is my order order_001?",
+    }
+    assert llm_step.output == {
+        "response_id": "response_1",
+    }
+
+    tool_step = agent.last_run.steps[1]
+
+    assert tool_step.step_number == 2
+    assert tool_step.step_type == "tool_execution"
+    assert tool_step.input == {
+        "call_id": "call_123",
+        "tool": "lookup_order",
+        "arguments": {
+            "order_id": "order_001",
+        },
+    }
+    assert tool_step.output == {
+        "order_id": "order_001",
+        "customer_id": "customer_001",
+        "status": "delivered",
+        "amount_cents": 12999,
+        "currency": "EUR",
+        "created_at": "2026-07-20",
+    }
+    assert tool_step.error is None
+
+
+    second_llm_step = agent.last_run.steps[2]
+
+    assert second_llm_step.step_number == 3
+    assert second_llm_step.step_type == "llm_call"
+    assert second_llm_step.input == {
+        "tool_outputs": [
+            {
+                "type": "function_call_output",
+                "call_id": "call_123",
+                "output": str({
+                    "order_id": "order_001",
+                    "customer_id": "customer_001",
+                    "status": "delivered",
+                    "amount_cents": 12999,
+                    "currency": "EUR",
+                    "created_at": "2026-07-20",
+                }),
+            }
+        ],
+    }
+    assert second_llm_step.output == {
+        "response_id": "response_2",
+    }
+    
+
+    final_step = agent.last_run.steps[3]
+
+    assert final_step.step_number == 4
+    assert final_step.step_type == "final"
+    assert final_step.input is None
+    assert final_step.output == {
+        "answer": "Your order has been delivered.",
+    }
+    assert final_step.error is None

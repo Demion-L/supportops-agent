@@ -55,8 +55,6 @@ class ToolResult(BaseModel):
     output: dict[str, object] | None = None
     error: str | None = None
 
-    
-
 
 def execute_tool_call(call: ToolCall) -> ToolResult:
     """Execute a validated tool call and return its structured result."""
