@@ -2,6 +2,7 @@ from unittest.mock import Mock
 
 from supportops_agent.agent import SupportAgent
 from supportops_agent.models import SupportTicket
+from supportops_agent.tool_executor import ToolResult
 
 
 class FakeResponse:
@@ -163,4 +164,41 @@ def test_agent_returns_tool_error_to_model(monkeypatch):
         }
     ]
 
+
+def test_build_tool_output_for_success():
+    agent = SupportAgent(FakeOpenAI())
+
+    tool_result = ToolResult(
+        call_id="call_123",
+        name="lookup_order",
+        output={"status": "delivered"},
+    )
+
+    result = agent.build_tool_output(tool_result)
+
+    assert result == {
+        "type": "function_call_output",
+        "call_id": "call_123",
+        "output": "{'status': 'delivered'}",
+    }
+
+
+def test_build_tool_output_for_error():
+    agent = SupportAgent(FakeOpenAI())
+
+    tool_result = ToolResult(
+        call_id="call_123",
+        name="lookup_order",
+        error="database connection failed",
+    )
+
+    result = agent.build_tool_output(tool_result)
+
+    assert result == {
+        "type": "function_call_output",
+        "call_id": "call_123",
+        "output": (
+            "Tool execution error: database connection failed"
+        ),
+    }
 

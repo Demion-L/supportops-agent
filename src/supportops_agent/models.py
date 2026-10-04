@@ -1,9 +1,10 @@
 """Data models used by SupportOps Agent."""
 
-from datetime import date
+from datetime import datetime
 from enum import StrEnum
-
+from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
+
 
 
 class OrderStatus(StrEnum):
@@ -43,4 +44,27 @@ class OrderRecord(BaseModel):
     status: OrderStatus
     amount_cents: int = Field(gt=0)
     currency: str = Field(pattern=r"^[A-Z]{3}$")
-    created_at: date
+    created_at: datetime
+
+
+class AgentStep(BaseModel):
+    """A single step in an agent execution."""
+
+    step_id: str = Field(default_factory=lambda: str(uuid4()))
+    step_number: int
+    step_type: str
+    input: dict[str, object] | None = None
+    output: dict[str, object] | None = None
+    error: str | None = None
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    finished_at: datetime | None = None
+
+
+class AgentRun(BaseModel):
+    """Execution trace for a single agent run."""
+
+    run_id: str = Field(default_factory=lambda: str(uuid4()))
+    ticket_id: str
+    steps: list[AgentStep] = Field(default_factory=list)
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    finished_at: datetime | None = None
