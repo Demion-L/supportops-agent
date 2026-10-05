@@ -1,8 +1,7 @@
-from unittest.mock import Mock
-
 from supportops_agent.agent import SupportAgent
-from supportops_agent.models import SupportTicket
+from supportops_agent.models import SupportTicket, AgentRunStatus
 from supportops_agent.tool_executor import ToolResult
+import pytest
 
 
 class FakeResponse:
@@ -215,6 +214,9 @@ def test_agent_creates_execution_trace():
 
     agent.run(ticket)
 
+    assert agent.last_run.status == AgentRunStatus.COMPLETED
+    assert agent.last_run.finished_at is not None
+
     assert agent.last_run is not None
     assert agent.last_run.ticket_id == "ticket_001"
 
@@ -276,7 +278,7 @@ def test_agent_creates_execution_trace():
     assert second_llm_step.output == {
         "response_id": "response_2",
     }
-    
+
 
     final_step = agent.last_run.steps[3]
 
@@ -287,3 +289,46 @@ def test_agent_creates_execution_trace():
         "answer": "Your order has been delivered.",
     }
     assert final_step.error is None
+
+    assert agent.last_run.status == AgentRunStatus.COMPLETED
+    assert agent.last_run.started_at is not None
+    assert agent.last_run.finished_at is not None
+    assert agent.last_run.finished_at >= agent.last_run.started_at
+
+
+def test_agent_marks_run_as_failed_when_step_limit_is_exceeded(monkeypatch):
+    client = FakeOpenAI()
+    agent = SupportAgent(client)
+
+    ticket = SupportTicket(
+        ticket_id="ticket_001",
+        customer_id="customer_001",
+        message="Where is my order order_001?",
+    )
+
+    def always_return_function_call(*args, **kwargs):
+        return FakeResponse(
+            response_id="response_loop",
+            output=[
+                FakeFunctionCall(
+                    call_id="call_123",
+                    name="lookup_order",
+                    arguments='{"order_id": "order_001"}',
+                )
+            ],
+        )
+
+    monkeypatch.setattr(
+        client.responses,
+        "create",
+        always_return_function_call,
+    )
+
+    with pytest.raises(RuntimeError, match="maximum number of steps"):
+        agent.run(ticket)
+
+    assert agent.last_run is not None
+    assert agent.last_run.status == AgentRunStatus.FAILED
+    assert agent.last_run.finished_at is not None
+
+

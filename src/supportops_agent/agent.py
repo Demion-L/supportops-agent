@@ -1,9 +1,19 @@
 from openai import OpenAI
 import json
-from .models import SupportTicket, AgentRun, AgentStep
-from .tool_executor import ToolCall, ToolResult, execute_tool_call
+from .models import (
+    SupportTicket, 
+    AgentRun, 
+    AgentStep, 
+    AgentRunStatus
+    )
+from .tool_executor import (
+    ToolCall, 
+    ToolResult, 
+    execute_tool_call
+    )
 from supportops_agent.tool_definitions import LOOKUP_ORDER_TOOL,\
 LOOKUP_CUSTOMER_TOOL
+from _datetime import UTC, datetime
 
 
 MAX_AGENT_STEPS = 10
@@ -80,6 +90,9 @@ class SupportAgent:
                     )
                 )
 
+                self.last_run.status = AgentRunStatus.COMPLETED
+                self.last_run.finished_at = datetime.now(UTC)
+
                 return response.output_text
 
 
@@ -125,6 +138,10 @@ class SupportAgent:
                     },
                 )
             )
+
+
+        self.last_run.status = AgentRunStatus.FAILED
+        self.last_run.finished_at = datetime.now(UTC)
 
         raise RuntimeError(
             f"Agent exceeded maximum number of steps: {MAX_AGENT_STEPS}"

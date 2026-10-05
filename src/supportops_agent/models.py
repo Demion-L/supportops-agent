@@ -60,11 +60,24 @@ class AgentStep(BaseModel):
     finished_at: datetime | None = None
 
 
+class AgentRunStatus(StrEnum):
+    """Lifecycle state of an agent run."""
+
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+    
 class AgentRun(BaseModel):
     """Execution trace for a single agent run."""
 
     run_id: str = Field(default_factory=lambda: str(uuid4()))
     ticket_id: str
+    status: AgentRunStatus = AgentRunStatus.RUNNING
     steps: list[AgentStep] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
+
+
+
+
