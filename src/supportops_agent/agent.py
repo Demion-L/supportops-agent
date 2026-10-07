@@ -1,19 +1,13 @@
-from openai import OpenAI
 import json
-from .models import (
-    SupportTicket, 
-    AgentRun, 
-    AgentStep, 
-    AgentRunStatus
-    )
-from .tool_executor import (
-    ToolCall, 
-    ToolResult, 
-    execute_tool_call
-    )
-from supportops_agent.tool_definitions import LOOKUP_ORDER_TOOL,\
-LOOKUP_CUSTOMER_TOOL
-from _datetime import UTC, datetime
+from openai import OpenAI
+
+from .models import AgentRun, AgentStep, SupportTicket
+from .run_manager import AgentRunManager
+from .tool_executor import ToolCall, ToolResult, execute_tool_call
+from supportops_agent.tool_definitions import (
+    LOOKUP_CUSTOMER_TOOL,
+    LOOKUP_ORDER_TOOL,
+)
 
 
 MAX_AGENT_STEPS = 10
@@ -21,9 +15,18 @@ MAX_AGENT_STEPS = 10
 class SupportAgent:
     def __init__(self, client: OpenAI):
         self.client = client
-        self.last_run: AgentRun | None = None
+        self.run_manager: AgentRunManager | None = None
 
-    def execute_function_call(self, item) -> object:
+    @property
+    def last_run(self) -> AgentRun | None:
+        """Return the most recent agent run."""
+
+        if self.run_manager is None:
+            return None
+
+        return self.run_manager.run    
+
+    def execute_function_call(self, item) -> ToolResult:
         tool_call = ToolCall(
             call_id=item.call_id,
             name=item.name,
@@ -48,9 +51,7 @@ class SupportAgent:
         }
 
     def run(self, ticket: SupportTicket) -> str:
-        self.last_run = AgentRun(
-            ticket_id=ticket.ticket_id,
-        )
+        self.run_manager = AgentRunManager(ticket.ticket_id)
 
         response = self.client.responses.create(
             model="gpt-4.1-mini",
@@ -58,9 +59,9 @@ class SupportAgent:
             tools=[LOOKUP_ORDER_TOOL, LOOKUP_CUSTOMER_TOOL],
         )
 
-        self.last_run.steps.append(
+        self.run_manager.add_step(
             AgentStep(
-                step_number=1,
+                step_number=self.run_manager.next_step_number(),
                 step_type="llm_call",
                 input={
                     "message": ticket.message,
@@ -79,9 +80,9 @@ class SupportAgent:
             ]
 
             if not function_calls:
-                self.last_run.steps.append(
+                self.run_manager.add_step(
                     AgentStep(
-                        step_number=len(self.last_run.steps) + 1,
+                        step_number=self.run_manager.next_step_number(),
                         step_type="final",
                         input=None,
                         output={
@@ -90,8 +91,7 @@ class SupportAgent:
                     )
                 )
 
-                self.last_run.status = AgentRunStatus.COMPLETED
-                self.last_run.finished_at = datetime.now(UTC)
+                self.run_manager.complete()
 
                 return response.output_text
 
@@ -102,9 +102,9 @@ class SupportAgent:
 
                 tool_result = self.execute_function_call(item)
 
-                self.last_run.steps.append(
+                self.run_manager.add_step(
                     AgentStep(
-                        step_number=len(self.last_run.steps) + 1,
+                        step_number=self.run_manager.next_step_number(),
                         step_type="tool_execution",
                         input={
                             "call_id": item.call_id,
@@ -126,9 +126,9 @@ class SupportAgent:
                 input=tool_outputs,
             )
 
-            self.last_run.steps.append(
+            self.run_manager.add_step(
                 AgentStep(
-                    step_number=len(self.last_run.steps) + 1,
+                    step_number=self.run_manager.next_step_number(),
                     step_type="llm_call",
                     input={
                         "tool_outputs": tool_outputs,
@@ -140,8 +140,7 @@ class SupportAgent:
             )
 
 
-        self.last_run.status = AgentRunStatus.FAILED
-        self.last_run.finished_at = datetime.now(UTC)
+        self.run_manager.fail()
 
         raise RuntimeError(
             f"Agent exceeded maximum number of steps: {MAX_AGENT_STEPS}"
