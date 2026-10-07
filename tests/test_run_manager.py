@@ -44,4 +44,18 @@ def test_run_manager_fails_run():
     assert manager.run.finished_at is not None
 
 
-    
+def test_run_manager_records_failure_step():
+    manager = AgentRunManager("ticket_001")
+
+    manager.fail("Something went wrong")
+
+    assert manager.run.status == AgentRunStatus.FAILED
+    assert manager.run.finished_at is not None
+
+    assert len(manager.run.steps) == 1
+
+    failure_step = manager.run.steps[0]
+
+    assert failure_step.step_number == 1
+    assert failure_step.step_type == "failure"
+    assert failure_step.error == "Something went wrong"

@@ -27,9 +27,16 @@ class AgentRunManager:
         self.run.status = AgentRunStatus.COMPLETED
         self.run.finished_at = datetime.now(UTC)
 
-    def fail(self) -> None:
+    def fail(self, error: str | None = None) -> None:
         """Mark the run as failed."""
+        if error is not None:
+            self.add_step(
+                AgentStep(
+                    step_number=self.next_step_number(),
+                    step_type="failure",
+                    error=error,
+                )
+            )
 
         self.run.status = AgentRunStatus.FAILED
         self.run.finished_at = datetime.now(UTC)
-        

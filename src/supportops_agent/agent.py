@@ -140,8 +140,10 @@ class SupportAgent:
             )
 
 
-        self.run_manager.fail()
-
-        raise RuntimeError(
+        error_message = (
             f"Agent exceeded maximum number of steps: {MAX_AGENT_STEPS}"
         )
+
+        self.run_manager.fail(error_message)
+
+        raise RuntimeError(error_message)

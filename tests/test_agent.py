@@ -331,4 +331,10 @@ def test_agent_marks_run_as_failed_when_step_limit_is_exceeded(monkeypatch):
     assert agent.last_run.status == AgentRunStatus.FAILED
     assert agent.last_run.finished_at is not None
 
+    assert agent.last_run.steps[-1].step_type == "failure"
+    assert (
+        agent.last_run.steps[-1].error
+        == "Agent exceeded maximum number of steps: 10"
+    )
+
 
