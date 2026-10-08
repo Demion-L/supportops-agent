@@ -47,12 +47,19 @@ class OrderRecord(BaseModel):
     created_at: date
 
 
+class AgentStepType(StrEnum):
+    LLM_CALL = "llm_call"
+    TOOL_EXECUTION = "tool_execution"
+    FINAL = "final"
+    FAILURE = "failure"
+    
+    
 class AgentStep(BaseModel):
     """A single step in an agent execution."""
 
     step_id: str = Field(default_factory=lambda: str(uuid4()))
     step_number: int
-    step_type: str
+    step_type: AgentStepType
     input: dict[str, object] | None = None
     output: dict[str, object] | None = None
     error: str | None = None
@@ -67,7 +74,6 @@ class AgentRunStatus(StrEnum):
     COMPLETED = "completed"
     FAILED = "failed"
 
-    
 class AgentRun(BaseModel):
     """Execution trace for a single agent run."""
 

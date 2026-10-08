@@ -1,4 +1,8 @@
-from supportops_agent.models import AgentRun, AgentStep
+from supportops_agent.models import (
+    AgentRun, 
+    AgentStep, 
+    AgentStepType
+    )
 
 
 def test_agent_run_starts_with_empty_steps():
@@ -12,12 +16,12 @@ def test_agent_run_starts_with_empty_steps():
 def test_agent_step_has_generated_id():
     step = AgentStep(
         step_number=1,
-        step_type="tool_call",
+        step_type=AgentStepType.TOOL_EXECUTION,
         input={"order_id": "order_001"},
     )
 
     assert step.step_number == 1
-    assert step.step_type == "tool_call"
+    assert step.step_type == AgentStepType.TOOL_EXECUTION
     assert step.input == {"order_id": "order_001"}
     assert step.step_id
 

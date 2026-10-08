@@ -2,7 +2,12 @@
 
 from datetime import UTC, datetime
 
-from supportops_agent.models import AgentRun, AgentRunStatus, AgentStep
+from supportops_agent.models import (
+    AgentRun, 
+    AgentRunStatus, 
+    AgentStep,
+    AgentStepType
+    )
 
 
 class AgentRunManager:
@@ -33,7 +38,7 @@ class AgentRunManager:
             self.add_step(
                 AgentStep(
                     step_number=self.next_step_number(),
-                    step_type="failure",
+                    step_type=AgentStepType.FAILURE,
                     error=error,
                 )
             )

@@ -1,7 +1,7 @@
 import json
 from openai import OpenAI
 
-from .models import AgentRun, AgentStep, SupportTicket
+from .models import AgentRun, AgentStep, AgentStepType, SupportTicket
 from .run_manager import AgentRunManager
 from .tool_executor import ToolCall, ToolResult, execute_tool_call
 from supportops_agent.tool_definitions import (
@@ -62,7 +62,7 @@ class SupportAgent:
         self.run_manager.add_step(
             AgentStep(
                 step_number=self.run_manager.next_step_number(),
-                step_type="llm_call",
+                step_type=AgentStepType.LLM_CALL,
                 input={
                     "message": ticket.message,
                 },
@@ -83,7 +83,7 @@ class SupportAgent:
                 self.run_manager.add_step(
                     AgentStep(
                         step_number=self.run_manager.next_step_number(),
-                        step_type="final",
+                        step_type=AgentStepType.FINAL,
                         input=None,
                         output={
                             "answer": response.output_text,
@@ -105,7 +105,7 @@ class SupportAgent:
                 self.run_manager.add_step(
                     AgentStep(
                         step_number=self.run_manager.next_step_number(),
-                        step_type="tool_execution",
+                        step_type=AgentStepType.TOOL_EXECUTION,
                         input={
                             "call_id": item.call_id,
                             "tool": item.name,
@@ -129,7 +129,7 @@ class SupportAgent:
             self.run_manager.add_step(
                 AgentStep(
                     step_number=self.run_manager.next_step_number(),
-                    step_type="llm_call",
+                    step_type=AgentStepType.LLM_CALL,
                     input={
                         "tool_outputs": tool_outputs,
                     },

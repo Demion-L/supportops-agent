@@ -1,4 +1,8 @@
-from supportops_agent.models import AgentRunStatus, AgentStep
+from supportops_agent.models import (
+    AgentRunStatus, 
+    AgentStep, 
+    AgentStepType
+    )
 from supportops_agent.run_manager import AgentRunManager
 
 
@@ -16,7 +20,7 @@ def test_run_manager_adds_steps():
 
     step = AgentStep(
         step_number=1,
-        step_type="llm_call",
+        step_type=AgentStepType.LLM_CALL,
     )
 
     manager.add_step(step)
@@ -57,5 +61,5 @@ def test_run_manager_records_failure_step():
     failure_step = manager.run.steps[0]
 
     assert failure_step.step_number == 1
-    assert failure_step.step_type == "failure"
+    assert failure_step.step_type == AgentStepType.FAILURE
     assert failure_step.error == "Something went wrong"
