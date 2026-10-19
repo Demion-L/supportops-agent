@@ -47,10 +47,10 @@
 - [x] Логировать tool calls, arguments и results
 - [x] Логировать agent steps и переходы между состояниями
 - [x] Отделить debug/trace data от final answer
-- [ ] Добавить явные failure steps в execution trace
-- [ ] Добавить timing / latency для tool calls
-- [ ] Подготовить данные для token / cost tracking
-- [ ] Сделать trace пригодным для debugging и evaluation
+- [x] Добавить явные failure steps в execution trace
+- [x] Добавить timing / latency для tool calls
+- [x] Подготовить данные для token / cost tracking
+- [x] Сделать trace пригодным для debugging и evaluation
 
 ## SupportOps Logic
 

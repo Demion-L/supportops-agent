@@ -65,6 +65,7 @@ class AgentStep(BaseModel):
     error: str | None = None
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
+    duration_ms: float | None = None
 
 
 class AgentRunStatus(StrEnum):
@@ -83,6 +84,33 @@ class AgentRun(BaseModel):
     steps: list[AgentStep] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
+
+    def summary(self) -> dict[str, object]:
+        """One-shot overview of the run, for debugging and evaluation."""
+
+        llm_steps = [s for s in self.steps if s.step_type == AgentStepType.LLM_CALL]
+        tool_steps = [s for s in self.steps if s.step_type == AgentStepType.TOOL_EXECUTION]
+        failure_steps = [s for s in self.steps if s.step_type == AgentStepType.FAILURE]
+
+        duration_ms = None
+        if self.finished_at is not None:
+            duration_ms = (self.finished_at - self.started_at).total_seconds() * 1000
+
+        total_tokens = sum(
+            usage["total_tokens"]
+            for step in llm_steps
+            if (usage := (step.output or {}).get("usage"))
+        )
+
+        return {
+            "status": self.status,
+            "duration_ms": duration_ms,
+            "llm_calls": len(llm_steps),
+            "tool_calls": len(tool_steps),
+            "failed_tool_calls": sum(1 for s in tool_steps if s.error is not None),
+            "total_tokens": total_tokens or None,
+            "error": failure_steps[-1].error if failure_steps else None,
+        }
 
 
 

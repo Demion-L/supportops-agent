@@ -2,7 +2,15 @@ from supportops_agent.agent import SupportAgent
 from supportops_agent.models import SupportTicket, AgentRunStatus, AgentStepType
 from supportops_agent.tool_executor import ToolResult
 import pytest
+from pydantic import ValidationError
 from supportops_agent.run_manager import AgentRunManager
+
+
+class FakeUsage:
+    def __init__(self, input_tokens, output_tokens, total_tokens):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.total_tokens = total_tokens
 
 
 class FakeResponse:
@@ -11,10 +19,12 @@ class FakeResponse:
         response_id,
         output=None,
         output_text="",
+        usage=None,
     ):
         self.id = response_id
         self.output = output or []
         self.output_text = output_text
+        self.usage = usage
 
 
 class FakeFunctionCall:
@@ -232,6 +242,8 @@ def test_agent_creates_execution_trace():
     }
     assert llm_step.output == {
         "response_id": "response_1",
+        "model": "gpt-4.1-mini",
+        "usage": None,
     }
 
     tool_step = agent.last_run.steps[1]
@@ -254,6 +266,11 @@ def test_agent_creates_execution_trace():
         "created_at": "2026-07-20",
     }
     assert tool_step.error is None
+
+    assert tool_step.finished_at is not None
+    assert tool_step.finished_at >= tool_step.started_at
+    assert tool_step.duration_ms is not None
+    assert tool_step.duration_ms >= 0
 
 
     second_llm_step = agent.last_run.steps[2]
@@ -278,6 +295,8 @@ def test_agent_creates_execution_trace():
     }
     assert second_llm_step.output == {
         "response_id": "response_2",
+        "model": "gpt-4.1-mini",
+        "usage": None,
     }
 
 
@@ -338,6 +357,81 @@ def test_agent_marks_run_as_failed_when_step_limit_is_exceeded(monkeypatch):
         == "Agent exceeded maximum number of steps: 10"
     )
 
+
+class UnknownToolResponses(FakeResponses):
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+
+        return FakeResponse(
+            response_id="response_1",
+            output=[
+                FakeFunctionCall(
+                    call_id="call_123",
+                    name="refund_order",
+                    arguments='{"order_id": "order_001"}',
+                )
+            ],
+        )
+
+
+class UnknownToolOpenAI:
+    def __init__(self):
+        self.responses = UnknownToolResponses()
+
+
+def test_agent_records_explicit_failure_step_for_unrecognized_tool_name():
+    client = UnknownToolOpenAI()
+    agent = SupportAgent(client)
+
+    ticket = SupportTicket(
+        ticket_id="ticket_008",
+        customer_id="customer_001",
+        message="Please refund my order order_001",
+    )
+
+    with pytest.raises(ValidationError):
+        agent.run(ticket)
+
+    assert agent.last_run.status == AgentRunStatus.FAILED
+    assert agent.last_run.finished_at is not None
+
+    assert agent.last_run.steps[-1].step_type == AgentStepType.FAILURE
+    assert agent.last_run.steps[-1].error is not None
+
+
+class BrokenResponses:
+    def __init__(self):
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        raise RuntimeError("OpenAI API unavailable")
+
+
+class BrokenOpenAI:
+    def __init__(self):
+        self.responses = BrokenResponses()
+
+
+def test_agent_records_explicit_failure_step_for_client_api_error():
+    client = BrokenOpenAI()
+    agent = SupportAgent(client)
+
+    ticket = SupportTicket(
+        ticket_id="ticket_009",
+        customer_id="customer_001",
+        message="Where is my order order_001?",
+    )
+
+    with pytest.raises(RuntimeError, match="OpenAI API unavailable"):
+        agent.run(ticket)
+
+    assert agent.last_run.status == AgentRunStatus.FAILED
+    assert agent.last_run.finished_at is not None
+
+    assert len(agent.last_run.steps) == 1
+    assert agent.last_run.steps[0].step_type == AgentStepType.FAILURE
+    assert agent.last_run.steps[0].error == "OpenAI API unavailable"
 
 
 class ParallelToolCallResponses(FakeResponses):
@@ -605,6 +699,124 @@ def test_agent_reports_malformed_tool_arguments_json_to_model():
         "Tool execution error: Invalid arguments for tool 'lookup_order'"
     )
     assert agent.last_run.status == AgentRunStatus.COMPLETED
+
+
+def test_extract_token_usage_returns_none_when_unavailable():
+    agent = SupportAgent(FakeOpenAI())
+
+    response = FakeResponse(response_id="response_1", output_text="hi")
+
+    assert agent.extract_token_usage(response) is None
+
+
+def test_extract_token_usage_returns_usage_dict_when_available():
+    agent = SupportAgent(FakeOpenAI())
+
+    response = FakeResponse(
+        response_id="response_1",
+        output_text="hi",
+        usage=FakeUsage(input_tokens=42, output_tokens=8, total_tokens=50),
+    )
+
+    assert agent.extract_token_usage(response) == {
+        "input_tokens": 42,
+        "output_tokens": 8,
+        "total_tokens": 50,
+    }
+
+
+class UsageReportingResponses(FakeResponses):
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+
+        if len(self.calls) == 1:
+            return FakeResponse(
+                response_id="response_1",
+                output=[
+                    FakeFunctionCall(
+                        call_id="call_123",
+                        name="lookup_order",
+                        arguments='{"order_id": "order_001"}',
+                    )
+                ],
+                usage=FakeUsage(
+                    input_tokens=120, output_tokens=15, total_tokens=135
+                ),
+            )
+
+        return FakeResponse(
+            response_id="response_2",
+            output_text="Your order has been delivered.",
+            usage=FakeUsage(
+                input_tokens=160, output_tokens=12, total_tokens=172
+            ),
+        )
+
+
+class UsageReportingOpenAI:
+    def __init__(self):
+        self.responses = UsageReportingResponses()
+
+
+def test_agent_records_token_usage_in_trace_when_available():
+    client = UsageReportingOpenAI()
+    agent = SupportAgent(client)
+
+    ticket = SupportTicket(
+        ticket_id="ticket_006",
+        customer_id="customer_001",
+        message="Where is my order order_001?",
+    )
+
+    agent.run(ticket)
+
+    llm_steps = [
+        step
+        for step in agent.last_run.steps
+        if step.step_type == AgentStepType.LLM_CALL
+    ]
+
+    assert llm_steps[0].output["model"] == "gpt-4.1-mini"
+    assert llm_steps[0].output["usage"] == {
+        "input_tokens": 120,
+        "output_tokens": 15,
+        "total_tokens": 135,
+    }
+    assert llm_steps[1].output["usage"] == {
+        "input_tokens": 160,
+        "output_tokens": 12,
+        "total_tokens": 172,
+    }
+
+
+def test_tool_execution_step_records_latency(monkeypatch):
+    import time
+
+    from supportops_agent.tool_executor import TOOL_REGISTRY
+
+    def slow_lookup_order(order_id: str):
+        time.sleep(0.02)
+        return {"order_id": order_id, "status": "delivered"}
+
+    monkeypatch.setitem(TOOL_REGISTRY, "lookup_order", slow_lookup_order)
+
+    client = FakeOpenAI()
+    agent = SupportAgent(client)
+
+    ticket = SupportTicket(
+        ticket_id="ticket_007",
+        customer_id="customer_001",
+        message="Where is my order order_001?",
+    )
+
+    agent.run(ticket)
+
+    tool_step = agent.last_run.steps[1]
+
+    assert tool_step.step_type == AgentStepType.TOOL_EXECUTION
+    assert tool_step.duration_ms is not None
+    assert tool_step.duration_ms >= 20
+    assert tool_step.finished_at >= tool_step.started_at
 
 
 def test_get_function_calls_extracts_function_calls():

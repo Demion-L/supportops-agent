@@ -1,4 +1,6 @@
 import json
+from datetime import UTC, datetime
+
 from openai import OpenAI
 from pydantic import ValidationError
 
@@ -12,6 +14,7 @@ from supportops_agent.tool_definitions import (
 
 
 MAX_AGENT_STEPS = 10
+MODEL_NAME = "gpt-4.1-mini"
 
 class SupportAgent:
     def __init__(self, client: OpenAI):
@@ -59,7 +62,10 @@ class SupportAgent:
         tool_outputs = []
 
         for item in function_calls:
+            started_at = datetime.now(UTC)
             tool_result = self.execute_function_call(item)
+            finished_at = datetime.now(UTC)
+            duration_ms = (finished_at - started_at).total_seconds() * 1000
 
             try:
                 arguments = json.loads(item.arguments)
@@ -77,12 +83,28 @@ class SupportAgent:
                     },
                     output=tool_result.output,
                     error=tool_result.error,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    duration_ms=duration_ms,
                 )
             )
 
             tool_outputs.append(self.build_tool_output(tool_result))
 
         return tool_outputs
+
+    def extract_token_usage(self, response) -> dict[str, int] | None:
+
+        usage = getattr(response, "usage", None)
+
+        if usage is None:
+            return None
+
+        return {
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "total_tokens": usage.total_tokens,
+        }
 
     def build_tool_output(self, tool_result: ToolResult) -> dict[str, str]:
         """Convert an internal ToolResult into the Responses API format."""
@@ -100,10 +122,18 @@ class SupportAgent:
         }
 
     def run(self, ticket: SupportTicket) -> str:
+        # any error aborting the loop gets recorded as a failure step below
         self.run_manager = AgentRunManager(ticket.ticket_id)
 
+        try:
+            return self._run_agent_loop(ticket)
+        except Exception as exc:
+            self.run_manager.fail(str(exc))
+            raise
+
+    def _run_agent_loop(self, ticket: SupportTicket) -> str:
         response = self.client.responses.create(
-            model="gpt-4.1-mini",
+            model=MODEL_NAME,
             input=ticket.message,
             tools=[LOOKUP_ORDER_TOOL, LOOKUP_CUSTOMER_TOOL],
         )
@@ -117,11 +147,13 @@ class SupportAgent:
                 },
                 output={
                     "response_id": response.id,
+                    "model": MODEL_NAME,
+                    "usage": self.extract_token_usage(response),
                 },
             )
         )
 
-        for step in range(MAX_AGENT_STEPS):
+        for _ in range(MAX_AGENT_STEPS):
             function_calls = self.get_function_calls(response)
 
             if not function_calls:
@@ -143,7 +175,7 @@ class SupportAgent:
             tool_outputs = self.execute_function_calls(function_calls)
 
             response = self.client.responses.create(
-                model="gpt-4.1-mini",
+                model=MODEL_NAME,
                 previous_response_id=response.id,
                 input=tool_outputs,
             )
@@ -157,14 +189,12 @@ class SupportAgent:
                     },
                     output={
                         "response_id": response.id,
+                        "model": MODEL_NAME,
+                        "usage": self.extract_token_usage(response),
                     },
                 )
             )
 
-        error_message = (
+        raise RuntimeError(
             f"Agent exceeded maximum number of steps: {MAX_AGENT_STEPS}"
         )
-
-        self.run_manager.fail(error_message)
-
-        raise RuntimeError(error_message)
