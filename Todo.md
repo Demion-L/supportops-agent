@@ -35,10 +35,10 @@
 - [x] Протестировать tool execution error
 - [x] Протестировать передачу `function_call_output` обратно модели
 - [x] Запускать всё через `pytest`
-- [ ] Добавить тесты на несколько последовательных tool calls
+- [x] Добавить тесты на несколько последовательных tool calls
 - [x] Добавить тест на достижение `MAX_AGENT_STEPS`
-- [ ] Добавить тесты на invalid tool arguments
-- [ ] Добавить integration tests для основных SupportOps сценариев
+- [x] Добавить тесты на invalid tool arguments
+- [x] Добавить integration tests для основных SupportOps сценариев
 
 ## Agent Observability
 

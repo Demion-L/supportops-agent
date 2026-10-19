@@ -71,6 +71,69 @@ def test_lookup_order_returns_none_for_unknown_order():
     assert result.output is None
 
 
+def test_lookup_order_rejects_missing_order_id():
+    with pytest.raises(ValidationError):
+        ToolCall(
+            call_id="test_missing_order_id",
+            name="lookup_order",
+            arguments={},
+        )
+
+
+def test_lookup_order_rejects_wrong_argument_type():
+    with pytest.raises(ValidationError):
+        ToolCall(
+            call_id="test_wrong_type",
+            name="lookup_order",
+            arguments={"order_id": 12345},
+        )
+
+
+def test_lookup_order_rejects_unexpected_field():
+    with pytest.raises(ValidationError):
+        ToolCall(
+            call_id="test_extra_field",
+            name="lookup_order",
+            arguments={"order_id": "order_001", "unexpected": "value"},
+        )
+
+
+def test_lookup_order_rejects_order_id_too_long():
+    with pytest.raises(ValidationError):
+        ToolCall(
+            call_id="test_too_long",
+            name="lookup_order",
+            arguments={"order_id": "x" * 101},
+        )
+
+
+def test_lookup_customer_rejects_missing_customer_id():
+    with pytest.raises(ValidationError):
+        ToolCall(
+            call_id="test_missing_customer_id",
+            name="lookup_customer",
+            arguments={},
+        )
+
+
+def test_lookup_customer_rejects_wrong_argument_type():
+    with pytest.raises(ValidationError):
+        ToolCall(
+            call_id="test_wrong_type",
+            name="lookup_customer",
+            arguments={"customer_id": ["customer_001"]},
+        )
+
+
+def test_tool_call_rejects_unknown_tool_name():
+    with pytest.raises(ValidationError):
+        ToolCall(
+            call_id="test_unknown_tool",
+            name="refund_order",
+            arguments={"order_id": "order_001"},
+        )
+
+
 def test_tool_execution_error_is_returned_as_result(monkeypatch):
     def failing_tool(order_id: str):
         raise RuntimeError("database connection failed")

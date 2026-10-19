@@ -1,9 +1,10 @@
 import json
 from openai import OpenAI
+from pydantic import ValidationError
 
 from .models import AgentRun, AgentStep, AgentStepType, SupportTicket
 from .run_manager import AgentRunManager
-from .tool_executor import ToolCall, ToolResult, execute_tool_call
+from .tool_executor import TOOL_REGISTRY, ToolCall, ToolResult, execute_tool_call
 from supportops_agent.tool_definitions import (
     LOOKUP_CUSTOMER_TOOL,
     LOOKUP_ORDER_TOOL,
@@ -26,14 +27,62 @@ class SupportAgent:
 
         return self.run_manager.run    
 
+    def get_function_calls(self, response) -> list:
+        """Extract function calls from an OpenAI response."""
+        return [
+            item for item in response.output
+            if item.type == "function_call"
+        ]
+
     def execute_function_call(self, item) -> ToolResult:
-        tool_call = ToolCall(
-            call_id=item.call_id,
-            name=item.name,
-            arguments=json.loads(item.arguments),
-        )
+
+        try:
+            tool_call = ToolCall(
+                call_id=item.call_id,
+                name=item.name,
+                arguments=json.loads(item.arguments),
+            )
+        except (json.JSONDecodeError, ValidationError) as exc:
+            if item.name not in TOOL_REGISTRY:
+                raise
+
+            return ToolResult(
+                call_id=item.call_id,
+                name=item.name,
+                error=f"Invalid arguments for tool '{item.name}': {exc}",
+            )
 
         return execute_tool_call(tool_call)
+
+    def execute_function_calls(self, function_calls: list) -> list[dict[str, str]]:
+
+        tool_outputs = []
+
+        for item in function_calls:
+            tool_result = self.execute_function_call(item)
+
+            try:
+                arguments = json.loads(item.arguments)
+            except json.JSONDecodeError:
+                arguments = item.arguments
+
+            self.run_manager.add_step(
+                AgentStep(
+                    step_number=self.run_manager.next_step_number(),
+                    step_type=AgentStepType.TOOL_EXECUTION,
+                    input={
+                        "call_id": item.call_id,
+                        "tool": item.name,
+                        "arguments": arguments,
+                    },
+                    output=tool_result.output,
+                    error=tool_result.error,
+                )
+            )
+
+            tool_outputs.append(self.build_tool_output(tool_result))
+
+        return tool_outputs
 
     def build_tool_output(self, tool_result: ToolResult) -> dict[str, str]:
         """Convert an internal ToolResult into the Responses API format."""
@@ -73,11 +122,7 @@ class SupportAgent:
         )
 
         for step in range(MAX_AGENT_STEPS):
-            function_calls = [
-                item
-                for item in response.output
-                if item.type == "function_call"
-            ]
+            function_calls = self.get_function_calls(response)
 
             if not function_calls:
                 self.run_manager.add_step(
@@ -95,30 +140,7 @@ class SupportAgent:
 
                 return response.output_text
 
-
-            tool_outputs = []
-
-            for item in function_calls:
-
-                tool_result = self.execute_function_call(item)
-
-                self.run_manager.add_step(
-                    AgentStep(
-                        step_number=self.run_manager.next_step_number(),
-                        step_type=AgentStepType.TOOL_EXECUTION,
-                        input={
-                            "call_id": item.call_id,
-                            "tool": item.name,
-                            "arguments": json.loads(item.arguments),
-                        },
-                        output=tool_result.output,
-                        error=tool_result.error,
-                    )
-                )
-
-                tool_outputs.append(
-                    self.build_tool_output(tool_result)
-                )
+            tool_outputs = self.execute_function_calls(function_calls)
 
             response = self.client.responses.create(
                 model="gpt-4.1-mini",
@@ -138,7 +160,6 @@ class SupportAgent:
                     },
                 )
             )
-
 
         error_message = (
             f"Agent exceeded maximum number of steps: {MAX_AGENT_STEPS}"
