@@ -591,6 +591,27 @@ def test_agent_executes_sequential_tool_calls_across_multiple_rounds():
     assert tool_steps[1].input["tool"] == "lookup_customer"
     assert agent.last_run.status == AgentRunStatus.COMPLETED
 
+    assert agent.state.ticket is ticket
+    assert agent.state.step_count == 2
+    assert agent.state.response.id == "response_3"
+
+
+def test_agent_state_tracks_ticket_and_step_count_for_a_single_tool_call():
+    client = FakeOpenAI()
+    agent = SupportAgent(client)
+
+    ticket = SupportTicket(
+        ticket_id="ticket_001",
+        customer_id="customer_001",
+        message="Where is my order order_001?",
+    )
+
+    agent.run(ticket)
+
+    assert agent.state.ticket is ticket
+    assert agent.state.step_count == 1
+    assert agent.state.response.id == "response_2"
+
 
 class InvalidArgumentsResponses(FakeResponses):
     def create(self, **kwargs):

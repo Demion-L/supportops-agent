@@ -9,8 +9,8 @@
 - [x] Вынести lifecycle run из `run()` в `AgentRunManager`
 - [x] Ввести явную модель `AgentRun`
 - [x] Ввести явную модель `AgentStep`
-- [ ] Вынести agent state из `run()`
-- [ ] Разделить orchestration, tool execution и response handling
+- [x] Вынести agent state из `run()`
+- [x] Разделить orchestration, tool execution и response handling
 
 ## Tools
 

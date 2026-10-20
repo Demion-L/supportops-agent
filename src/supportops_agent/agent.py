@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 from openai import OpenAI
 from pydantic import ValidationError
 
-from .models import AgentRun, AgentStep, AgentStepType, SupportTicket
+from .agent_state import AgentState
+from .models import AgentRun, AgentStepType, SupportTicket
 from .run_manager import AgentRunManager
 from .tool_executor import TOOL_REGISTRY, ToolCall, ToolResult, execute_tool_call
 from supportops_agent.tool_definitions import (
@@ -20,6 +21,7 @@ class SupportAgent:
     def __init__(self, client: OpenAI):
         self.client = client
         self.run_manager: AgentRunManager | None = None
+        self.state: AgentState | None = None
 
     @property
     def last_run(self) -> AgentRun | None:
@@ -30,7 +32,8 @@ class SupportAgent:
 
         return self.run_manager.run    
 
-    def get_function_calls(self, response) -> list:
+    @staticmethod
+    def get_function_calls(response) -> list:
         """Extract function calls from an OpenAI response."""
         return [
             item for item in response.output
@@ -72,28 +75,26 @@ class SupportAgent:
             except json.JSONDecodeError:
                 arguments = item.arguments
 
-            self.run_manager.add_step(
-                AgentStep(
-                    step_number=self.run_manager.next_step_number(),
-                    step_type=AgentStepType.TOOL_EXECUTION,
-                    input={
-                        "call_id": item.call_id,
-                        "tool": item.name,
-                        "arguments": arguments,
-                    },
-                    output=tool_result.output,
-                    error=tool_result.error,
-                    started_at=started_at,
-                    finished_at=finished_at,
-                    duration_ms=duration_ms,
-                )
+            self.run_manager.record(
+                AgentStepType.TOOL_EXECUTION,
+                input={
+                    "call_id": item.call_id,
+                    "tool": item.name,
+                    "arguments": arguments,
+                },
+                output=tool_result.output,
+                error=tool_result.error,
+                started_at=started_at,
+                finished_at=finished_at,
+                duration_ms=duration_ms,
             )
 
             tool_outputs.append(self.build_tool_output(tool_result))
 
         return tool_outputs
 
-    def extract_token_usage(self, response) -> dict[str, int] | None:
+    @staticmethod
+    def extract_token_usage(response) -> dict[str, int] | None:
 
         usage = getattr(response, "usage", None)
 
@@ -106,7 +107,8 @@ class SupportAgent:
             "total_tokens": usage.total_tokens,
         }
 
-    def build_tool_output(self, tool_result: ToolResult) -> dict[str, str]:
+    @staticmethod
+    def build_tool_output(tool_result: ToolResult) -> dict[str, str]:
         """Convert an internal ToolResult into the Responses API format."""
 
         output = (
@@ -132,69 +134,66 @@ class SupportAgent:
             raise
 
     def _run_agent_loop(self, ticket: SupportTicket) -> str:
-        response = self.client.responses.create(
-            model=MODEL_NAME,
-            input=ticket.message,
-            tools=[LOOKUP_ORDER_TOOL, LOOKUP_CUSTOMER_TOOL],
-        )
+        """Orchestrate the loop; delegates the rest to dedicated helpers."""
 
-        self.run_manager.add_step(
-            AgentStep(
-                step_number=self.run_manager.next_step_number(),
-                step_type=AgentStepType.LLM_CALL,
-                input={
-                    "message": ticket.message,
-                },
-                output={
-                    "response_id": response.id,
-                    "model": MODEL_NAME,
-                    "usage": self.extract_token_usage(response),
-                },
-            )
-        )
+        self.state = self._start(ticket)
 
         for _ in range(MAX_AGENT_STEPS):
-            function_calls = self.get_function_calls(response)
+            function_calls = self.get_function_calls(self.state.response)
 
             if not function_calls:
-                self.run_manager.add_step(
-                    AgentStep(
-                        step_number=self.run_manager.next_step_number(),
-                        step_type=AgentStepType.FINAL,
-                        input=None,
-                        output={
-                            "answer": response.output_text,
-                        },
-                    )
-                )
+                return self._finish()
 
-                self.run_manager.complete()
-
-                return response.output_text
-
-            tool_outputs = self.execute_function_calls(function_calls)
-
-            response = self.client.responses.create(
-                model=MODEL_NAME,
-                previous_response_id=response.id,
-                input=tool_outputs,
-            )
-
-            self.run_manager.add_step(
-                AgentStep(
-                    step_number=self.run_manager.next_step_number(),
-                    step_type=AgentStepType.LLM_CALL,
-                    input={
-                        "tool_outputs": tool_outputs,
-                    },
-                    output={
-                        "response_id": response.id,
-                        "model": MODEL_NAME,
-                        "usage": self.extract_token_usage(response),
-                    },
-                )
-            )
+            self._advance(function_calls)
 
         raise RuntimeError(
             f"Agent exceeded maximum number of steps: {MAX_AGENT_STEPS}"
+        )
+
+    def _start(self, ticket: SupportTicket) -> AgentState:
+        response = self._call_model(ticket.message)
+        self._record_llm_step({"message": ticket.message}, response)
+
+        return AgentState(ticket=ticket, response=response)
+
+    def _advance(self, function_calls: list) -> None:
+        tool_outputs = self.execute_function_calls(function_calls)
+
+        self.state.response = self._call_model(
+            tool_outputs,
+            previous_response_id=self.state.response.id,
+        )
+        self.state.step_count += 1
+
+        self._record_llm_step({"tool_outputs": tool_outputs}, self.state.response)
+
+    def _finish(self) -> str:
+        self.run_manager.record(
+            AgentStepType.FINAL,
+            output={"answer": self.state.response.output_text},
+        )
+
+        self.run_manager.complete()
+
+        return self.state.response.output_text
+
+    def _call_model(self, model_input, *, previous_response_id: str | None = None):
+        kwargs = {"model": MODEL_NAME, "input": model_input}
+
+        if previous_response_id is None:
+            kwargs["tools"] = [LOOKUP_ORDER_TOOL, LOOKUP_CUSTOMER_TOOL]
+        else:
+            kwargs["previous_response_id"] = previous_response_id
+
+        return self.client.responses.create(**kwargs)
+
+    def _record_llm_step(self, input_payload: dict, response) -> None:
+        self.run_manager.record(
+            AgentStepType.LLM_CALL,
+            input=input_payload,
+            output={
+                "response_id": response.id,
+                "model": MODEL_NAME,
+                "usage": self.extract_token_usage(response),
+            },
         )
