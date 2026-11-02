@@ -291,7 +291,7 @@ def test_expected_classification_errors_keep_controlled_fallback(kind):
 
 # ---- безопасность fallback ------------------------------------------------------
 # Инвариант: ошибка классификации не расширяет полномочия агента.
-# ВАЖНО: has_side_effects / requires_approval пока лишь metadata, а не авторизация.
+# Авторизация (authorization.py) не зависит от классификации; см. tests/test_authorization.py.
 
 class FnCall:
     type = "function_call"
@@ -316,10 +316,10 @@ class ScriptedResponses(FakeResponses):
         return r
 
 
-def make_agent(call, classifier):
+def make_agent(call, classifier, context=None):
     client = FakeClient()
     client.responses = ScriptedResponses(call)
-    return SupportAgent(client, classifier=classifier), client
+    return SupportAgent(client, classifier=classifier, context=context), client
 
 
 FAILING = lambda: StubClassifier(exc=ClassificationError("api_error", "down"))  # noqa: E731
@@ -357,18 +357,17 @@ def test_invalid_tool_arguments_still_rejected_regardless_of_classification(name
     assert tool_step.error and "Invalid arguments" in tool_step.error
 
 
-def test_side_effect_tool_authorization_is_not_enforced_yet():
-    """ХАРАКТЕРИЗАЦИОННЫЙ тест (фиксирует известный пробел, а не желаемое).
-
-    create_support_case имеет has_side_effects=True, но ToolExecutor не
-    проверяет эти флаги: инструмент выполняется без какого-либо одобрения,
-    с любой классификацией. Когда появится Policy Engine, тест нужно заменить.
-    """
+def test_authorization_does_not_depend_on_classification():
+    """Полномочия задаёт только явный доверенный context, не классификация."""
     from supportops_agent import mock_data
+    from supportops_agent.authorization import support_agent_context
 
     args = '{"ticket_id": "t1", "reason": "r", "priority": "high"}'
     for name in CLASSIFIERS:
         mock_data.CASES.clear()
-        agent, _ = make_agent(FnCall("create_support_case", args), CLASSIFIERS[name]())
+        agent, _ = make_agent(
+            FnCall("create_support_case", args), CLASSIFIERS[name](),
+            context=support_agent_context(),
+        )
         agent.run(ticket())
         assert len(mock_data.CASES) == 1, name

@@ -1,4 +1,5 @@
 from supportops_agent.agent import SupportAgent
+from supportops_agent.authorization import support_agent_context
 from supportops_agent.models import SupportTicket, AgentRunStatus, AgentStepType
 from supportops_agent.tool_executor import ToolResult
 import pytest
@@ -100,7 +101,7 @@ class FailingOpenAI:
 
 def test_agent_executes_tool_and_returns_final_answer():
     client = FakeOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_001",
@@ -145,7 +146,7 @@ def test_agent_returns_tool_error_to_model(monkeypatch):
     monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", failing_tool)
 
     client = FailingOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_001",
@@ -211,7 +212,7 @@ def test_build_tool_output_for_error():
 
 def test_agent_creates_execution_trace():
     client = FakeOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_001",
@@ -314,7 +315,7 @@ def test_agent_creates_execution_trace():
 
 def test_agent_marks_run_as_failed_when_step_limit_is_exceeded(monkeypatch):
     client = FakeOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_001",
@@ -377,7 +378,7 @@ class UnknownToolOpenAI:
 
 def test_agent_records_explicit_failure_step_for_unrecognized_tool_name():
     client = UnknownToolOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_008",
@@ -411,7 +412,7 @@ class BrokenOpenAI:
 
 def test_agent_records_explicit_failure_step_for_client_api_error():
     client = BrokenOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_009",
@@ -464,7 +465,7 @@ class ParallelToolCallOpenAI:
 
 def test_agent_executes_multiple_tool_calls_from_a_single_response():
     client = ParallelToolCallOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_002",
@@ -560,7 +561,7 @@ class SequentialToolCallOpenAI:
 
 def test_agent_executes_sequential_tool_calls_across_multiple_rounds():
     client = SequentialToolCallOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_003",
@@ -594,7 +595,7 @@ def test_agent_executes_sequential_tool_calls_across_multiple_rounds():
 
 def test_agent_state_tracks_ticket_and_step_count_for_a_single_tool_call():
     client = FakeOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_001",
@@ -638,7 +639,7 @@ class InvalidArgumentsOpenAI:
 
 def test_agent_reports_invalid_tool_arguments_to_model_instead_of_crashing():
     client = InvalidArgumentsOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_004",
@@ -697,7 +698,7 @@ class MalformedJsonOpenAI:
 
 def test_agent_reports_malformed_tool_arguments_json_to_model():
     client = MalformedJsonOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_005",
@@ -777,7 +778,7 @@ class UsageReportingOpenAI:
 
 def test_agent_records_token_usage_in_trace_when_available():
     client = UsageReportingOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_006",
@@ -818,7 +819,7 @@ def test_tool_execution_step_records_latency(monkeypatch):
     monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", slow_lookup_order)
 
     client = FakeOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_007",
@@ -838,7 +839,7 @@ def test_tool_execution_step_records_latency(monkeypatch):
 
 def test_get_function_calls_extracts_function_calls():
     client = FakeOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     response = FakeResponse(
         response_id="response_1",
@@ -860,7 +861,7 @@ def test_get_function_calls_extracts_function_calls():
 
 def test_execute_function_calls_returns_tool_outputs():
     client = FakeOpenAI()
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
     agent.run_manager = AgentRunManager("ticket_123")
 
     function_call = FakeFunctionCall(

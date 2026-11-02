@@ -6,6 +6,8 @@ from pydantic import ValidationError
 
 from supportops_agent import mock_data
 from supportops_agent.agent import SupportAgent
+from supportops_agent.authorization import support_agent_context
+from supportops_agent.authorization import support_agent_context
 from supportops_agent.models import AgentRunStatus, SupportTicket
 from supportops_agent.tool_definitions import ToolDefinition, get_llm_tool_schemas
 from supportops_agent.tool_executor import (
@@ -25,7 +27,10 @@ ALL_TOOLS = {
 
 
 def run(name, **arguments):
-    return execute_tool_call(ToolCall(call_id="c1", name=name, arguments=arguments))
+    return execute_tool_call(
+        ToolCall(call_id="c1", name=name, arguments=arguments),
+        support_agent_context(),
+    )
 
 
 # --- get_order_tracking -----------------------------------------------------
@@ -284,7 +289,7 @@ def test_agent_runs_new_tools_and_sends_registry_schemas():
             _Response("r2", text="done"),
         ]
     )
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
     ticket = SupportTicket(ticket_id="t9", customer_id="customer_001", message="refund?")
 
     assert agent.run(ticket) == "done"
@@ -303,7 +308,7 @@ def test_agent_reports_invalid_new_tool_arguments_to_model():
             _Response("r2", text="sorry"),
         ]
     )
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
     agent.run(SupportTicket(ticket_id="t", customer_id="customer_001", message="hi"))
 
     step = next(s for s in agent.last_run.steps if s.step_type == "tool_execution")

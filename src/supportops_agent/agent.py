@@ -12,6 +12,11 @@ from .classification import (
     format_classification_context,
 )
 from .agent_state import AgentState
+from .authorization import (
+    DEFAULT_POLICY,
+    ExecutionContext,
+    ToolAuthorizationPolicy,
+)
 from .models import AgentRun, AgentStepType, SupportTicket
 from .run_manager import AgentRunManager
 from .tool_executor import TOOL_REGISTRY, ToolCall, ToolResult, execute_tool_call
@@ -22,11 +27,26 @@ MAX_AGENT_STEPS = 10
 MODEL_NAME = "gpt-4.1-mini"
 
 class SupportAgent:
-    def __init__(self, client: OpenAI, classifier: TicketClassifier | None = None):
-        """`classifier=None` отключает классификацию (поведение как раньше)."""
+    def __init__(
+        self,
+        client: OpenAI,
+        classifier: TicketClassifier | None = None,
+        *,
+        context: ExecutionContext | None = None,
+        policy: ToolAuthorizationPolicy | None = DEFAULT_POLICY,
+    ):
+        """`classifier=None` отключает классификацию (поведение как раньше).
+
+        `context` / `policy` — доверенные полномочия, задаются только кодом
+        приложения (никогда из ответа модели). Неявных
+        полномочий нет: без явно переданного `context` любой вызов бизнес-
+        инструмента отклоняется Authorization Gate (MISSING_CONTEXT).
+        """
 
         self.client = client
         self.classifier = classifier
+        self.context = context
+        self.policy = policy
         self.run_manager: AgentRunManager | None = None
         self.state: AgentState | None = None
 
@@ -66,7 +86,7 @@ class SupportAgent:
                 error_type="invalid_arguments",
             )
 
-        return execute_tool_call(tool_call)
+        return execute_tool_call(tool_call, self.context, self.policy)
 
     def execute_function_calls(self, function_calls: list) -> list[dict[str, str]]:
 
@@ -89,6 +109,14 @@ class SupportAgent:
                     "call_id": item.call_id,
                     "tool": item.name,
                     "arguments": arguments,
+                    **(
+                        {
+                            "reason_code": tool_result.reason_code,
+                            "diagnostic_type": tool_result.diagnostic_type,
+                        }
+                        if tool_result.diagnostic_type
+                        else {}
+                    ),
                 },
                 output=tool_result.output,
                 error=tool_result.error,

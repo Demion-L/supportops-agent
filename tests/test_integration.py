@@ -1,6 +1,7 @@
 import pytest
 
 from supportops_agent.agent import SupportAgent
+from supportops_agent.authorization import support_agent_context
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
 
 
@@ -55,7 +56,7 @@ def test_order_status_inquiry_resolves_via_lookup_order():
             ),
         ]
     )
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_order_status",
@@ -89,7 +90,7 @@ def test_customer_account_inquiry_resolves_via_lookup_customer():
             ),
         ]
     )
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_account_info",
@@ -135,7 +136,7 @@ def test_combined_order_and_customer_inquiry_resolves_sequentially():
             ),
         ]
     )
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_combined",
@@ -183,7 +184,7 @@ def test_unknown_order_is_reported_back_to_customer_gracefully():
             ),
         ]
     )
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_unknown_order",
@@ -231,7 +232,7 @@ def test_tool_outage_is_surfaced_to_customer_without_crashing_the_run(monkeypatc
             ),
         ]
     )
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_tool_outage",
@@ -261,7 +262,7 @@ def test_agent_gives_up_and_fails_the_run_when_model_loops_forever():
         ],
     )
     client = ScriptedOpenAI([forever_looping_response] * 20)
-    agent = SupportAgent(client)
+    agent = SupportAgent(client, context=support_agent_context())
 
     ticket = SupportTicket(
         ticket_id="ticket_runaway_loop",

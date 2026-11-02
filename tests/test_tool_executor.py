@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
+from supportops_agent.authorization import support_agent_context
 from supportops_agent.tool_executor import (
     ToolCall,
     execute_tool_call,
@@ -15,7 +16,7 @@ def test_execute_lookup_customer():
         arguments={"customer_id": "customer_001"},
     )
 
-    result = execute_tool_call(call)
+    result = execute_tool_call(call, support_agent_context())
 
     assert result.call_id == "test_customer"
     assert result.name == "lookup_customer"
@@ -33,7 +34,7 @@ def test_execute_lookup_order():
         arguments={"order_id": "order_001"},
     )
 
-    result = execute_tool_call(call)
+    result = execute_tool_call(call, support_agent_context())
 
     assert result.call_id == "test_order"
     assert result.name == "lookup_order"
@@ -64,7 +65,7 @@ def test_lookup_order_returns_none_for_unknown_order():
         arguments={"order_id": "order_999"},
     )
 
-    result = execute_tool_call(call)
+    result = execute_tool_call(call, support_agent_context())
 
     assert result.call_id == "test_unknown_order"
     assert result.name == "lookup_order"
@@ -146,7 +147,7 @@ def test_tool_execution_error_is_returned_as_result(monkeypatch):
         arguments={"order_id": "order_001"},
     )
 
-    result = execute_tool_call(call)
+    result = execute_tool_call(call, support_agent_context())
 
     assert result.call_id == "test_failing_order"
     assert result.name == "lookup_order"
