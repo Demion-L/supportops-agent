@@ -142,11 +142,7 @@ def test_agent_returns_tool_error_to_model(monkeypatch):
 
     from supportops_agent.tool_executor import TOOL_REGISTRY
 
-    monkeypatch.setitem(
-        TOOL_REGISTRY,
-        "lookup_order",
-        failing_tool,
-    )
+    monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", failing_tool)
 
     client = FailingOpenAI()
     agent = SupportAgent(client)
@@ -819,7 +815,7 @@ def test_tool_execution_step_records_latency(monkeypatch):
         time.sleep(0.02)
         return {"order_id": order_id, "status": "delivered"}
 
-    monkeypatch.setitem(TOOL_REGISTRY, "lookup_order", slow_lookup_order)
+    monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", slow_lookup_order)
 
     client = FakeOpenAI()
     agent = SupportAgent(client)

@@ -1,34 +1,132 @@
+"""Tool metadata: the single source of truth for execution and LLM schemas."""
 
-LOOKUP_ORDER_TOOL = {
-    "type": "function",
-    "name": "lookup_order",
-    "description": "Look up an order by its order ID and return its current status and details.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "order_id": {
-                "type": "string",
-                "description": "The ID of the order to look up.",
-            }
-        },
-        "required": ["order_id"],
-        "additionalProperties": False,
-    },
-}
+from collections.abc import Callable
+from dataclasses import dataclass
 
-LOOKUP_CUSTOMER_TOOL = {
-    "type": "function",
-    "name": "lookup_customer",
-    "description": "Look up a customer by their customer ID and return their details.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "customer_id": {
-                "type": "string",
-                "description": "The ID of the customer to look up.",
-            }
-        },
-        "required": ["customer_id"],
-        "additionalProperties": False,
-    },
-}
+from pydantic import BaseModel, ConfigDict, Field
+
+from supportops_agent.models import CasePriority
+from supportops_agent.tools import (
+    check_refund_eligibility,
+    create_support_case,
+    get_order_tracking,
+    lookup_customer,
+    lookup_order,
+)
+
+
+class _Arguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class LookupOrderArguments(_Arguments):
+    """Validated arguments for the lookup_order tool."""
+
+    order_id: str = Field(min_length=1, max_length=100, description="The ID of the order to look up.")
+
+
+class LookupCustomerArguments(_Arguments):
+    """Validated arguments for the lookup_customer tool."""
+
+    customer_id: str = Field(min_length=1, max_length=100, description="The ID of the customer to look up.")
+
+
+class GetOrderTrackingArguments(_Arguments):
+    """Validated arguments for the get_order_tracking tool."""
+
+    order_id: str = Field(min_length=1, max_length=100, description="The ID of the order to track.")
+
+
+class CheckRefundEligibilityArguments(_Arguments):
+    """Validated arguments for the check_refund_eligibility tool."""
+
+    order_id: str = Field(min_length=1, max_length=100, description="The ID of the order to check.")
+
+
+class CreateSupportCaseArguments(_Arguments):
+    """Validated arguments for the create_support_case tool."""
+
+    ticket_id: str = Field(min_length=1, max_length=100, description="The ID of the support ticket the case belongs to.")
+    reason: str = Field(min_length=1, max_length=1000, description="Why the case is being opened.")
+    priority: CasePriority = Field(description="Case priority.")
+
+
+@dataclass
+class ToolDefinition:
+    """Everything the system knows about a tool."""
+
+    name: str
+    description: str
+    arguments_model: type[BaseModel]
+    handler: Callable[..., object]
+    has_side_effects: bool = False
+    requires_approval: bool = False
+
+    def to_llm_schema(self) -> dict[str, object]:
+        """Provider-neutral JSON-schema function spec (OpenAI Responses shape)."""
+
+        parameters = self.arguments_model.model_json_schema()
+        parameters.pop("title", None)
+        for prop in parameters.get("properties", {}).values():
+            prop.pop("title", None)
+
+        return {
+            "type": "function",
+            "name": self.name,
+            "description": self.description,
+            "parameters": parameters,
+        }
+
+
+_DEFINITIONS = [
+    ToolDefinition(
+        name="lookup_order",
+        description="Look up an order by its order ID and return its current status and details.",
+        arguments_model=LookupOrderArguments,
+        handler=lookup_order,
+    ),
+    ToolDefinition(
+        name="lookup_customer",
+        description="Look up a customer by their customer ID and return their details.",
+        arguments_model=LookupCustomerArguments,
+        handler=lookup_customer,
+    ),
+    ToolDefinition(
+        name="get_order_tracking",
+        description=(
+            "Get shipment tracking (carrier, tracking number, shipment status) for an order. "
+            "The result 'outcome' says whether tracking exists, the order is not shipped yet, "
+            "has no shipment, or was not found."
+        ),
+        arguments_model=GetOrderTrackingArguments,
+        handler=get_order_tracking,
+    ),
+    ToolDefinition(
+        name="check_refund_eligibility",
+        description=(
+            "Check whether an order is eligible for a refund under company policy. "
+            "Read-only: it does NOT issue a refund."
+        ),
+        arguments_model=CheckRefundEligibilityArguments,
+        handler=check_refund_eligibility,
+    ),
+    ToolDefinition(
+        name="create_support_case",
+        description=(
+            "Open an internal support case for a ticket so a human agent can follow up. "
+            "Retrying with the same ticket and reason returns the existing case "
+            "instead of creating a duplicate."
+        ),
+        arguments_model=CreateSupportCaseArguments,
+        handler=create_support_case,
+        has_side_effects=True,
+    ),
+]
+
+TOOL_REGISTRY: dict[str, ToolDefinition] = {d.name: d for d in _DEFINITIONS}
+
+
+def get_llm_tool_schemas() -> list[dict[str, object]]:
+    """LLM function schemas for every registered tool."""
+
+    return [d.to_llm_schema() for d in TOOL_REGISTRY.values()]

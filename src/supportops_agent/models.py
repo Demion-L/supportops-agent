@@ -47,6 +47,25 @@ class OrderRecord(BaseModel):
     created_at: date
 
 
+class CasePriority(StrEnum):
+    """Supported priorities of an internal support case."""
+
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
+class SupportCase(BaseModel):
+    """Internal support case created from a ticket."""
+
+    case_id: str
+    ticket_id: str
+    reason: str
+    priority: CasePriority
+    status: str = "open"
+
+
 class AgentStepType(StrEnum):
     LLM_CALL = "llm_call"
     TOOL_EXECUTION = "tool_execution"

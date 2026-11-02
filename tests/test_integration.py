@@ -208,7 +208,7 @@ def test_tool_outage_is_surfaced_to_customer_without_crashing_the_run(monkeypatc
     def failing_lookup_order(order_id: str):
         raise RuntimeError("database connection failed")
 
-    monkeypatch.setitem(TOOL_REGISTRY, "lookup_order", failing_lookup_order)
+    monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", failing_lookup_order)
 
     client = ScriptedOpenAI(
         [

@@ -8,10 +8,7 @@ from .agent_state import AgentState
 from .models import AgentRun, AgentStepType, SupportTicket
 from .run_manager import AgentRunManager
 from .tool_executor import TOOL_REGISTRY, ToolCall, ToolResult, execute_tool_call
-from supportops_agent.tool_definitions import (
-    LOOKUP_CUSTOMER_TOOL,
-    LOOKUP_ORDER_TOOL,
-)
+from supportops_agent.tool_definitions import get_llm_tool_schemas
 
 
 MAX_AGENT_STEPS = 10
@@ -56,6 +53,7 @@ class SupportAgent:
                 call_id=item.call_id,
                 name=item.name,
                 error=f"Invalid arguments for tool '{item.name}': {exc}",
+                error_type="invalid_arguments",
             )
 
         return execute_tool_call(tool_call)
@@ -181,7 +179,7 @@ class SupportAgent:
         kwargs = {"model": MODEL_NAME, "input": model_input}
 
         if previous_response_id is None:
-            kwargs["tools"] = [LOOKUP_ORDER_TOOL, LOOKUP_CUSTOMER_TOOL]
+            kwargs["tools"] = get_llm_tool_schemas()
         else:
             kwargs["previous_response_id"] = previous_response_id
 

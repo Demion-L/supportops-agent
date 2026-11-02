@@ -138,11 +138,7 @@ def test_tool_execution_error_is_returned_as_result(monkeypatch):
     def failing_tool(order_id: str):
         raise RuntimeError("database connection failed")
 
-    monkeypatch.setitem(
-        TOOL_REGISTRY,
-        "lookup_order",
-        failing_tool,
-    )
+    monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", failing_tool)
 
     call = ToolCall(
         call_id="test_failing_order",
