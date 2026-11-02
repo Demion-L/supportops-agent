@@ -67,6 +67,7 @@ class SupportCase(BaseModel):
 
 
 class AgentStepType(StrEnum):
+    CLASSIFICATION = "classification"
     LLM_CALL = "llm_call"
     TOOL_EXECUTION = "tool_execution"
     FINAL = "final"
@@ -110,6 +111,9 @@ class AgentRun(BaseModel):
         llm_steps = [s for s in self.steps if s.step_type == AgentStepType.LLM_CALL]
         tool_steps = [s for s in self.steps if s.step_type == AgentStepType.TOOL_EXECUTION]
         failure_steps = [s for s in self.steps if s.step_type == AgentStepType.FAILURE]
+        classification_steps = [
+            s for s in self.steps if s.step_type == AgentStepType.CLASSIFICATION
+        ]
 
         duration_ms = None
         if self.finished_at is not None:
@@ -117,7 +121,7 @@ class AgentRun(BaseModel):
 
         total_tokens = sum(
             usage["total_tokens"]
-            for step in llm_steps
+            for step in [*classification_steps, *llm_steps]
             if (usage := (step.output or {}).get("usage"))
         )
 
@@ -125,6 +129,9 @@ class AgentRun(BaseModel):
             "status": self.status,
             "duration_ms": duration_ms,
             "llm_calls": len(llm_steps),
+            "classification_failed": any(
+                s.error is not None for s in classification_steps
+            ),
             "tool_calls": len(tool_steps),
             "failed_tool_calls": sum(1 for s in tool_steps if s.error is not None),
             "total_tokens": total_tokens or None,

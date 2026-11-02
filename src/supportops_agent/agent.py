@@ -4,6 +4,13 @@ from datetime import UTC, datetime
 from openai import OpenAI
 from pydantic import ValidationError
 
+from .classification import (
+    ClassificationError,
+    ClassificationResult,
+    TicketClassification,
+    TicketClassifier,
+    format_classification_context,
+)
 from .agent_state import AgentState
 from .models import AgentRun, AgentStepType, SupportTicket
 from .run_manager import AgentRunManager
@@ -15,8 +22,11 @@ MAX_AGENT_STEPS = 10
 MODEL_NAME = "gpt-4.1-mini"
 
 class SupportAgent:
-    def __init__(self, client: OpenAI):
+    def __init__(self, client: OpenAI, classifier: TicketClassifier | None = None):
+        """`classifier=None` отключает классификацию (поведение как раньше)."""
+
         self.client = client
+        self.classifier = classifier
         self.run_manager: AgentRunManager | None = None
         self.state: AgentState | None = None
 
@@ -149,10 +159,89 @@ class SupportAgent:
         )
 
     def _start(self, ticket: SupportTicket) -> AgentState:
-        response = self._call_model(ticket.message)
+        classification = self._classify(ticket)
+        response = self._call_model(self._build_initial_input(ticket, classification))
         self._record_llm_step({"message": ticket.message}, response)
 
         return AgentState(ticket=ticket, response=response)
+
+    def _classify(self, ticket: SupportTicket) -> TicketClassification | None:
+        """Classify before the loop.
+
+        ClassificationError is traced and degrades to no context; any other
+        exception is a defect: it is traced and propagated (run -> FAILED).
+        """
+
+        if self.classifier is None:
+            return None
+
+        started_at = datetime.now(UTC)
+        # Текст обращения в trace не пишем (персональные данные) — только длину.
+        input_payload = {"message_length": len(ticket.message)}
+
+        try:
+            result: ClassificationResult = self.classifier.classify(ticket)
+        except ClassificationError as exc:
+            # Ожидаемая ошибка классификации: контролируемый fallback.
+            self._record_classification_error(
+                input_payload, started_at, f"{type(exc).__name__}: {exc}",
+                output={"fallback": True},
+            )
+            return None
+        except Exception as exc:
+            # Программный дефект: фиксируем диагностику и НЕ подавляем.
+            # run() переведёт AgentRun в FAILED и пробросит исключение.
+            self._record_classification_error(
+                input_payload, started_at,
+                f"Unexpected classifier error: {type(exc).__name__}: {exc}",
+                output={"fallback": False, "unexpected_error": True},
+            )
+            raise
+
+        finished_at = datetime.now(UTC)
+        self.run_manager.record(
+            AgentStepType.CLASSIFICATION,
+            input=input_payload,
+            output={
+                "classification": result.classification.model_dump(mode="json"),
+                "model": result.model,
+                "response_id": result.response_id,
+                "usage": result.usage,
+            },
+            started_at=started_at,
+            finished_at=finished_at,
+            duration_ms=(finished_at - started_at).total_seconds() * 1000,
+        )
+        return result.classification
+
+    def _record_classification_error(
+        self, input_payload: dict, started_at: datetime, error: str, *, output: dict
+    ) -> None:
+        finished_at = datetime.now(UTC)
+        self.run_manager.record(
+            AgentStepType.CLASSIFICATION,
+            input=input_payload,
+            output=output,
+            error=error,
+            started_at=started_at,
+            finished_at=finished_at,
+            duration_ms=(finished_at - started_at).total_seconds() * 1000,
+        )
+
+    @staticmethod
+    def _build_initial_input(
+        ticket: SupportTicket, classification: TicketClassification | None
+    ):
+        if classification is None:
+            return ticket.message
+
+        return [
+            {
+                "role": "developer",
+                "content": format_classification_context(classification),
+            },
+            {"role": "user", "content": ticket.message},
+        ]
 
     def _advance(self, function_calls: list) -> None:
         tool_outputs = self.execute_function_calls(function_calls)

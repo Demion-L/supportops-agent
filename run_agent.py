@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from supportops_agent.agent import SupportAgent
+from supportops_agent.classification import OpenAITicketClassifier
 from supportops_agent.models import SupportTicket
 
 load_dotenv()
@@ -9,7 +10,7 @@ load_dotenv()
 
 client = OpenAI()
 
-agent = SupportAgent(client)
+agent = SupportAgent(client, classifier=OpenAITicketClassifier(client))
 
 ticket = SupportTicket(
     ticket_id="ticket_001",
