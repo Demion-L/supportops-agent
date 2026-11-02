@@ -16,9 +16,12 @@ Read this file first on every session start.
 ## Project
 
 **Name:** supportops-agent  
-**Language:** typescript  
+**Language:** python  
 **AI Tool:** claude  
 **MONOLITH Root:** `.monolith/`
+
+Python project (`>=3.11`, setuptools, dependencies locked with `uv.lock`; tests run with `pytest`).
+npm is used only to install the MONOLITH CLI (`@latysh-development/monolith`, devDependency).
 
 <!-- Add project description here -->
 

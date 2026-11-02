@@ -1,13 +1,13 @@
 {
   "project": {
     "name": "supportops-agent",
-    "language": "typescript",
-    "packageManager": "pnpm",
+    "language": "python",
+    "packageManager": "other",
     "aiTool": "claude"
   },
   "monolithRoot": ".monolith",
   "contextGateway": {
-    "adrDirs": ["docs/adr"]
+    "adrDirs": []
   },
   "finalizationProtocol": "finalize-story",
   "gates": {
