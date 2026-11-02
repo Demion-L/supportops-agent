@@ -22,3 +22,8 @@ dist/
 *.egg-info/
 
 node_modules/
+
+# MONOLITH runtime state
+.monolith/state.json
+.monolith/memory/working/governance-result.md
+.monolith/memory/working/integrity-result.md
