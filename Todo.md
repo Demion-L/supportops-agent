@@ -1,5 +1,7 @@
 # TODO
 
+> Легенда: `[x]` готово, `[~]` частично, `[ ]` не начато.
+
 ## Agent Core
 
 - [x] Рефакторинг `SupportAgent.run()`
@@ -20,9 +22,10 @@
 - [x] Добавить обработку ошибок tools
 - [x] Унифицировать контракт tool execution: `output / error`
 - [x] Добавить преобразование tool result → OpenAI `function_call_output`
-- [ ] Добавить новые business tools
-- [ ] Определить стабильный контракт для всех tools
-- [ ] Добавить tool-level metadata / descriptions
+- [x] Добавить новые business tools (`get_order_tracking`, `check_refund_eligibility`, `create_support_case`)
+- [x] Определить стабильный контракт для всех tools (`ToolDefinition` + `ToolResult`: output / error / error_type / reason_code)
+- [x] Добавить tool-level metadata / descriptions (`description`, `has_side_effects`, `requires_approval`)
+- [x] Добавить Tool Authorization Gate (`ExecutionContext` + `ToolAuthorizationPolicy`, deny-by-default) — AUTH-001/002
 
 ## Testing
 
@@ -54,12 +57,15 @@
 
 ## SupportOps Logic
 
-- [ ] Добавить classification layer
-- [ ] Добавить policy / decision layer
-- [ ] Определить сценарии `resolve / escalate`
-- [ ] Добавить human escalation
+- [x] Добавить classification layer (+ eval: `evals/classification_dataset.json`, `scripts/eval_classification.py`)
+- [x] Добавить policy / decision layer (детерминированный refund policy engine: `policy.py`, `refund_facts.py`, `refund_evaluation.py`; результат пишется в trace, попадает в контекст модели и определяет детерминированную refund-часть ответа — решение принимает Policy Engine, а не LLM; код закоммичен в `b5f866c`)
+- [x] Подключить результат policy decision к ответу агента (POLICY-003: developer-контекст + детерминированная refund-часть ответа; `check_refund_eligibility` работает через `RefundPolicyEngine`)
+- [ ] Подключить policy decision к escalate/resolve-флоу и ограничению действий (нужен approval workflow)
+- [ ] Ownership-проверка для `lookup_order` / `lookup_customer` / `get_order_tracking` (сейчас доверенный customer_id применяется только к refund-оценке)
+- [~] Определить сценарии `resolve / escalate` (policy engine выдаёт ALLOW/DENY/EXCEPTION_ELIGIBLE/HUMAN_REVIEW; сценарии агента не определены)
+- [~] Добавить human escalation (есть tool `create_support_case`; нет escalation-флоу и правил остановки)
 - [ ] Добавить action / execution layer
-- [ ] Добавить audit trail
+- [~] Добавить audit trail (есть execution trace + POLICY_DECISION/CLASSIFICATION шаги; нет персистентного/неизменяемого журнала)
 - [ ] Определить правила, когда агент обязан остановиться и передать тикет человеку
 
 ## State & Persistence
@@ -96,12 +102,13 @@
 
 ## Evaluation
 
-- [ ] Создать набор тестовых SupportOps scenarios
+- [ ] Security eval: authority-claim запросы (IDEA-001) — Gate должен отклонять независимо от классификации
+- [~] Создать набор тестовых SupportOps scenarios (есть только classification dataset)
 - [ ] Определить expected agent behavior
 - [ ] Проверять правильность tool selection
 - [ ] Проверять правильность final decision
 - [ ] Проверять `resolve / escalate` decisions
-- [ ] Добавить evaluation dataset
+- [~] Добавить evaluation dataset (только для classification)
 - [ ] Добавить automated agent evaluation
 
 ## Learning / Architecture Milestones

@@ -16,34 +16,41 @@ Update this file at the end of each work session before closing.
 
 ## Active Story
 
-<!-- STORY X.Y — Story Name -->
+None. SUPPORTOPS-SEC-003 is prepared but NOT activated (needs owner approval).
 
 ---
 
 ## Objective
 
-<!-- What was being worked on? What is the goal of this story? -->
+SUPPORTOPS-MONOLITH-001 (integration task, not a story): connect MONOLITH 0.1.0-alpha.2 and
+reconstruct project context without faking history.
 
 ---
 
 ## Completed This Session
 
-<!-- Bullet list of what was done. -->
+- Roadmap (7 phases) written in `context/maps/roadmap-index.md`.
+- Retrospective summaries for Phases 1–3 and Todo.md mapping in `context/retrospective/`.
+- SEC-003 scope/acceptance draft in `context/planned/SUPPORTOPS-SEC-003.md`.
+- No finalize, no execution-history entries, no mission checkpoints, no commits.
 
 ---
 
 ## Constraints
 
-<!-- Any constraints or decisions made that the next session must respect. -->
+- Retrospective records are not finalized stories; never present them as such.
+- During the Historical Bootstrap, `Todo.md` and the Python application were not modified. However, uncommitted changes to these files already existed in the working tree before the migration began; they were preserved unmodified.
+- At the time of the Historical Bootstrap, POLICY-001/002/003 and related work were not yet committed (they sat in the working tree). They were later committed as part of the combined checkpoint commit `b5f866c` (Classification, Authorization, Refund Policy). That commit is not a separate historical commit per POLICY task, and a Git commit is not a native MONOLITH finalization.
 
 ---
 
 ## Next Step
 
-<!-- Exactly what to do first in the next session. Be specific. -->
+Owner decides: (1) review and commit the documentation changes (Commit 2); the Phase 3 code is already committed in `b5f866c`, (2) answer the open questions in
+`context/planned/SUPPORTOPS-SEC-003.md`, (3) approve activation of SEC-003.
 
 ---
 
 ## Files in Flight
 
-<!-- Files that were being edited but may not be complete. -->
+None (all documentation edits complete). Application code is committed in `b5f866c`; the documentation changes are pending Commit 2.

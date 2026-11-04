@@ -17,7 +17,7 @@ referenced_by:
 
 ## Active Phase
 
-No active phase.
+Phase 3 — Safety & Policy (status and scope: `context/maps/roadmap-index.md`).
 
 ---
 
@@ -37,5 +37,8 @@ No finalization recorded yet.
 
 ## Current Operational Focus
 
-<!-- Update this section when starting the first phase. -->
-<!-- Describe what the project is building and what is in focus now. -->
+SupportOps Agent: Python support-ticket agent (tool-calling loop, execution trace,
+classification, tool authorization gate, deterministic refund policy).
+Phases 1–3 history is a retrospective reconstruction (`context/retrospective/`), not finalized stories.
+No story is active. Candidate next story, awaiting owner activation: SUPPORTOPS-SEC-003
+(`context/planned/SUPPORTOPS-SEC-003.md`).
