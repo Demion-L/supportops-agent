@@ -41,6 +41,7 @@ ORDERS: dict[str, OrderRecord] = {
         amount_cents=12999,
         currency="EUR",
         created_at=date(2026, 7, 20),
+        delivered_at=date(2026, 7, 24),
     ),
     "order_002": OrderRecord(
         order_id="order_002",
@@ -97,6 +98,7 @@ ORDERS: dict[str, OrderRecord] = {
         amount_cents=5400,
         currency="EUR",
         created_at=date(2026, 9, 20),
+        delivered_at=date(2026, 9, 23),
     ),
 }
 

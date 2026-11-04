@@ -6,12 +6,12 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, Field
 
 from supportops_agent.models import CasePriority
+from supportops_agent.refund_evaluation import check_refund_eligibility
 from supportops_agent.tools import (
-    check_refund_eligibility,
     create_support_case,
     get_order_tracking,
     lookup_customer,
-    lookup_order,
+    lookup_order_for_tool,
 )
 
 
@@ -61,6 +61,9 @@ class ToolDefinition:
     handler: Callable[..., object]
     has_side_effects: bool = False
     requires_approval: bool = False
+    # Handler получает `trusted_customer_id` от ToolExecutor (из доверенного
+    # контекста приложения). В аргументах LLM такого поля нет и быть не может.
+    requires_trusted_identity: bool = False
 
     def to_llm_schema(self) -> dict[str, object]:
         """Provider-neutral JSON-schema function spec (OpenAI Responses shape)."""
@@ -83,7 +86,7 @@ _DEFINITIONS = [
         name="lookup_order",
         description="Look up an order by its order ID and return its current status and details.",
         arguments_model=LookupOrderArguments,
-        handler=lookup_order,
+        handler=lookup_order_for_tool,
     ),
     ToolDefinition(
         name="lookup_customer",
@@ -104,11 +107,14 @@ _DEFINITIONS = [
     ToolDefinition(
         name="check_refund_eligibility",
         description=(
-            "Check whether an order is eligible for a refund under company policy. "
-            "Read-only: it does NOT issue a refund."
+            "Assess whether the customer's own order meets the company refund policy "
+            "(the decision comes from the policy engine; the customer identity is "
+            "verified by the system, not by arguments). "
+            "Read-only: it does NOT issue a refund and does NOT approve exceptions."
         ),
         arguments_model=CheckRefundEligibilityArguments,
         handler=check_refund_eligibility,
+        requires_trusted_identity=True,
     ),
     ToolDefinition(
         name="create_support_case",

@@ -157,11 +157,17 @@ def execute_tool_call(
     call: ToolCall,
     context: ExecutionContext | None = None,
     policy: ToolAuthorizationPolicy | None = DEFAULT_POLICY,
+    *,
+    trusted_customer_id: str | None = None,
 ) -> ToolResult:
     """Authorize, then execute a validated tool call.
 
     ``context`` must come from trusted application code. Omitting it (or
     passing anything that is not an ``ExecutionContext``) is a DENY.
+
+    ``trusted_customer_id`` is the application-verified identity of the ticket
+    owner. It is forwarded only to tools flagged ``requires_trusted_identity``
+    and is never read from ``call.arguments`` (the models forbid extra fields).
     """
 
     definition = TOOL_REGISTRY.get(call.name)
@@ -172,7 +178,11 @@ def execute_tool_call(
         return refusal
 
     try:
-        result = definition.handler(**call.arguments.model_dump())
+        kwargs = call.arguments.model_dump()
+        if definition.requires_trusted_identity:
+            kwargs["trusted_customer_id"] = trusted_customer_id
+
+        result = definition.handler(**kwargs)
 
         if isinstance(result, BaseModel):
             result = result.model_dump(mode="json")

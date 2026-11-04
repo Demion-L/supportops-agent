@@ -5,25 +5,37 @@ from supportops_agent.agent import SupportAgent
 from supportops_agent.authorization import support_agent_context
 from supportops_agent.classification import OpenAITicketClassifier
 from supportops_agent.models import SupportTicket
+from supportops_agent.refund_evaluation import default_refund_evaluator
 
-load_dotenv()
+
+def build_agent(client: OpenAI) -> SupportAgent:
+    """Явная композиция зависимостей (ничего не берётся из ответов модели)."""
+
+    return SupportAgent(
+        client,
+        classifier=OpenAITicketClassifier(client),
+        context=support_agent_context(),
+        refund_evaluator=default_refund_evaluator(),
+    )
 
 
-client = OpenAI()
+def main() -> None:
+    load_dotenv()
+    agent = build_agent(OpenAI())
 
-agent = SupportAgent(
-    client,
-    classifier=OpenAITicketClassifier(client),
-    context=support_agent_context(),
-)
+    # Доверенная идентичность: customer_id задаёт приложение (здесь — демо-тикет),
+    # а не текст обращения.
+    ticket = SupportTicket(
+        ticket_id="ticket_001",
+        customer_id="customer_001",
+        message="What is the email address of customer_001?",
+    )
 
-ticket = SupportTicket(
-    ticket_id="ticket_001",
-    customer_id="customer_001",
-    message="What is the email address of customer_001?"
-)
+    answer = agent.run(ticket)
 
-answer = agent.run(ticket)
+    print("\nFinal answer:")
+    print(answer)
 
-print("\nFinal answer:")
-print(answer)
+
+if __name__ == "__main__":
+    main()

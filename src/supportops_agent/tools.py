@@ -1,7 +1,6 @@
 """Deterministic tools available to SupportOps Agent."""
 
 import hashlib
-from datetime import date
 
 from supportops_agent import mock_data
 from supportops_agent.mock_data import CUSTOMERS, ORDERS
@@ -12,9 +11,23 @@ from supportops_agent.models import (
     SupportCase,
 )
 
-# Business rule: delivered/paid orders can be refunded within this many days
-# of the order date (inclusive).
-REFUND_WINDOW_DAYS = 30
+# Публичный контракт lookup_order (виден LLM) задан белым списком: новые поля
+# OrderRecord (в т.ч. delivered_at) наружу не попадают, пока их явно не добавят.
+ORDER_PUBLIC_FIELDS = ("order_id", "customer_id", "status", "amount_cents", "currency", "created_at")
+
+
+def serialize_order_for_tool(order: OrderRecord) -> dict[str, object]:
+    """Публичное представление заказа для LLM (контракт lookup_order)."""
+
+    full = order.model_dump(mode="json")
+    return {name: full[name] for name in ORDER_PUBLIC_FIELDS}
+
+
+def lookup_order_for_tool(order_id: str) -> dict[str, object] | None:
+    """Handler инструмента lookup_order: явная сериализация на границе."""
+
+    order = lookup_order(order_id)
+    return None if order is None else serialize_order_for_tool(order)
 
 
 def lookup_order(order_id: str) -> OrderRecord | None:
@@ -67,51 +80,6 @@ def get_order_tracking(order_id: str) -> dict[str, object]:
         "order_id": order.order_id,
         "order_status": order.status,
         **tracking,
-    }
-
-
-def check_refund_eligibility(
-    order_id: str, today: date | None = None
-) -> dict[str, object]:
-    """Decide whether an order may be refunded. Never performs a refund.
-
-    Rules, checked in order:
-      1. refunded   -> not eligible (already_refunded)
-      2. cancelled  -> not eligible (order_cancelled)
-      3. shipped    -> not eligible (not_delivered_yet)
-      4. paid / delivered -> eligible only if at most REFUND_WINDOW_DAYS
-         days passed since the order date (otherwise window_expired)
-    """
-
-    order = lookup_order(order_id)
-
-    if order is None:
-        return {"outcome": "order_not_found", "order_id": order_id.strip()}
-
-    today = today or mock_data.BUSINESS_DATE
-    days_since_order = (today - order.created_at).days
-
-    if order.status == OrderStatus.REFUNDED:
-        eligible, reason = False, "already_refunded"
-    elif order.status == OrderStatus.CANCELLED:
-        eligible, reason = False, "order_cancelled"
-    elif order.status == OrderStatus.SHIPPED:
-        eligible, reason = False, "not_delivered_yet"
-    elif days_since_order > REFUND_WINDOW_DAYS:
-        eligible, reason = False, "window_expired"
-    else:
-        eligible, reason = True, "within_refund_window"
-
-    return {
-        "outcome": "eligible" if eligible else "not_eligible",
-        "order_id": order.order_id,
-        "eligible": eligible,
-        "reason": reason,
-        "order_status": order.status,
-        "days_since_order": days_since_order,
-        "refund_window_days": REFUND_WINDOW_DAYS,
-        "amount_cents": order.amount_cents,
-        "currency": order.currency,
     }
 
 

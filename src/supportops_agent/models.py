@@ -45,6 +45,11 @@ class OrderRecord(BaseModel):
     amount_cents: int = Field(gt=0)
     currency: str = Field(pattern=r"^[A-Z]{3}$")
     created_at: date
+    # Канонический источник даты доставки. None — доставка не подтверждена.
+    # Не выводится из created_at и не из TRACKING.last_update.
+    # Доменная модель сериализуется полностью; публичный контракт инструмента
+    # lookup_order задаётся явно в tools.serialize_order_for_tool.
+    delivered_at: date | None = None
 
 
 class CasePriority(StrEnum):
@@ -68,6 +73,7 @@ class SupportCase(BaseModel):
 
 class AgentStepType(StrEnum):
     CLASSIFICATION = "classification"
+    POLICY_DECISION = "policy_decision"
     LLM_CALL = "llm_call"
     TOOL_EXECUTION = "tool_execution"
     FINAL = "final"

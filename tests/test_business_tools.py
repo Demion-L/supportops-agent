@@ -15,7 +15,7 @@ from supportops_agent.tool_executor import (
     ToolCall,
     execute_tool_call,
 )
-from supportops_agent.tools import check_refund_eligibility
+from supportops_agent.refund_evaluation import check_refund_eligibility
 
 ALL_TOOLS = {
     "lookup_order",
@@ -26,10 +26,11 @@ ALL_TOOLS = {
 }
 
 
-def run(name, **arguments):
+def run(name, trusted_customer_id=None, **arguments):
     return execute_tool_call(
         ToolCall(call_id="c1", name=name, arguments=arguments),
         support_agent_context(),
+        trusted_customer_id=trusted_customer_id,
     )
 
 
@@ -63,41 +64,55 @@ def test_tracking_unknown_order_is_business_outcome_not_error():
 # --- check_refund_eligibility -----------------------------------------------
 
 @pytest.mark.parametrize(
-    "order_id, eligible, reason",
+    "order_id, customer, decision, reason",
     [
-        ("order_008", True, "within_refund_window"),  # delivered, 11 days
-        ("order_003", True, "within_refund_window"),  # paid, exactly 30 days
-        ("order_001", False, "window_expired"),       # delivered, 73 days
-        ("order_002", False, "not_delivered_yet"),
-        ("order_004", False, "order_cancelled"),
-        ("order_005", False, "already_refunded"),
+        ("order_008", "customer_001", "allow", "within_standard_window"),  # 8 days
+        ("order_001", "customer_001", "deny", "outside_grace_period"),     # 69 days
+        ("order_003", "customer_003", "deny", "not_delivered_yet"),
+        ("order_002", "customer_002", "deny", "not_delivered_yet"),
+        ("order_004", "customer_004", "deny", "order_cancelled"),
+        ("order_005", "customer_005", "deny", "already_refunded"),
     ],
 )
-def test_refund_rules(order_id, eligible, reason):
-    result = run("check_refund_eligibility", order_id=order_id)
+def test_refund_tool_returns_engine_decision(order_id, customer, decision, reason):
+    result = run("check_refund_eligibility", trusted_customer_id=customer, order_id=order_id)
     assert result.error is None
-    assert result.output["eligible"] is eligible
-    assert result.output["reason"] == reason
-    assert result.output["outcome"] == ("eligible" if eligible else "not_eligible")
+    assert result.output["outcome"] == "evaluated"
+    assert result.output["decision"] == decision
+    assert result.output["reason_code"] == reason
+    assert result.output["policy_version"] == "refund-policy-v1"
 
 
-def test_refund_window_boundary_uses_injected_date():
-    # order_003 was created 2026-09-01: day 30 is eligible, day 31 is not.
-    assert check_refund_eligibility("order_003", today=date(2026, 10, 1))["eligible"]
-    late = check_refund_eligibility("order_003", today=date(2026, 10, 2))
-    assert late["eligible"] is False and late["reason"] == "window_expired"
-    assert late["days_since_order"] == 31
+def test_refund_tool_uses_injected_date_with_engine_boundaries():
+    # order_008 доставлен 2026-09-23: дни 40/41/45/46 -> allow/exception/exception/deny
+    from datetime import timedelta
+
+    delivered = date(2026, 9, 23)
+    expected = {40: "allow", 41: "exception_eligible", 45: "exception_eligible", 46: "deny"}
+    for days, decision in expected.items():
+        out = check_refund_eligibility(
+            "order_008", trusted_customer_id="customer_001",
+            today=delivered + timedelta(days=days),
+        )
+        assert out["decision"] == decision and out["days_since_delivery"] == days
 
 
-def test_refund_unknown_order():
-    result = run("check_refund_eligibility", order_id="order_999")
-    assert result.error is None
-    assert result.output["outcome"] == "order_not_found"
+def test_refund_unknown_order_is_not_distinguishable_from_foreign_order():
+    unknown = run("check_refund_eligibility", trusted_customer_id="customer_001", order_id="order_999")
+    foreign = run("check_refund_eligibility", trusted_customer_id="customer_001", order_id="order_002")
+    assert unknown.error is None and unknown.output == foreign.output
+    assert unknown.output["outcome"] == "order_not_verified"
+    assert "decision" not in unknown.output
+
+
+def test_refund_tool_without_trusted_identity_reveals_nothing():
+    result = run("check_refund_eligibility", order_id="order_008")
+    assert result.output == {"outcome": "identity_verification_required"}
 
 
 def test_refund_check_does_not_modify_orders():
     before = mock_data.ORDERS["order_008"].model_copy()
-    run("check_refund_eligibility", order_id="order_008")
+    run("check_refund_eligibility", trusted_customer_id="customer_001", order_id="order_008")
     assert mock_data.ORDERS["order_008"] == before
 
 
@@ -297,7 +312,7 @@ def test_agent_runs_new_tools_and_sends_registry_schemas():
     assert client.responses.calls[0]["tools"] == get_llm_tool_schemas()
     tool_steps = [s for s in agent.last_run.steps if s.step_type == "tool_execution"]
     assert [s.error for s in tool_steps] == [None, None]
-    assert tool_steps[0].output["eligible"] is True
+    assert tool_steps[0].output["decision"] == "allow"
     assert len(mock_data.CASES) == 1
 
 

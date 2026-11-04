@@ -18,6 +18,12 @@ from .authorization import (
     ToolAuthorizationPolicy,
 )
 from .models import AgentRun, AgentStepType, SupportTicket
+from .refund_evaluation import (
+    RefundEvaluationOrchestrator,
+    RefundEvaluationResult,
+    RefundEvaluationStatus,
+)
+from .refund_response import build_policy_context, compose_final_answer
 from .run_manager import AgentRunManager
 from .tool_executor import TOOL_REGISTRY, ToolCall, ToolResult, execute_tool_call
 from supportops_agent.tool_definitions import get_llm_tool_schemas
@@ -34,8 +40,14 @@ class SupportAgent:
         *,
         context: ExecutionContext | None = None,
         policy: ToolAuthorizationPolicy | None = DEFAULT_POLICY,
+        refund_evaluator: RefundEvaluationOrchestrator | None = None,
     ):
         """`classifier=None` отключает классификацию (поведение как раньше).
+
+        Граница доверия: `ticket.customer_id` считается подтверждённой
+        идентичностью — его обязано установить приложение из аутентифицированной
+        сессии. Текст обращения, вывод LLM и аргументы tool call идентичность
+        не задают и не меняют (см. `execute_function_call`).
 
         `context` / `policy` — доверенные полномочия, задаются только кодом
         приложения (никогда из ответа модели). Неявных
@@ -47,7 +59,11 @@ class SupportAgent:
         self.classifier = classifier
         self.context = context
         self.policy = policy
+        # Опционально: None -> оценка возврата отключена (поведение как раньше).
+        # Результат идёт только в trace; не влияет на context/policy/tools.
+        self.refund_evaluator = refund_evaluator
         self.run_manager: AgentRunManager | None = None
+        self.refund_result: RefundEvaluationResult | None = None
         self.state: AgentState | None = None
 
     @property
@@ -86,7 +102,13 @@ class SupportAgent:
                 error_type="invalid_arguments",
             )
 
-        return execute_tool_call(tool_call, self.context, self.policy)
+        # Идентичность берётся из доверенного тикета, не из аргументов модели.
+        return execute_tool_call(
+            tool_call,
+            self.context,
+            self.policy,
+            trusted_customer_id=self.state.ticket.customer_id if self.state else None,
+        )
 
     def execute_function_calls(self, function_calls: list) -> list[dict[str, str]]:
 
@@ -162,6 +184,7 @@ class SupportAgent:
     def run(self, ticket: SupportTicket) -> str:
         # any error aborting the loop gets recorded as a failure step below
         self.run_manager = AgentRunManager(ticket.ticket_id)
+        self.refund_result = None
 
         try:
             return self._run_agent_loop(ticket)
@@ -172,6 +195,7 @@ class SupportAgent:
     def _run_agent_loop(self, ticket: SupportTicket) -> str:
         """Orchestrate the loop; delegates the rest to dedicated helpers."""
 
+        self.state = None
         self.state = self._start(ticket)
 
         for _ in range(MAX_AGENT_STEPS):
@@ -188,10 +212,17 @@ class SupportAgent:
 
     def _start(self, ticket: SupportTicket) -> AgentState:
         classification = self._classify(ticket)
-        response = self._call_model(self._build_initial_input(ticket, classification))
+        self.refund_result = self._evaluate_refund(ticket, classification)
+        # Тикет доступен инструментам (доверенная идентичность) уже с первого вызова.
+        state = AgentState(ticket=ticket, response=None)
+        self.state = state
+        response = self._call_model(
+            self._build_initial_input(ticket, classification, self.refund_result)
+        )
         self._record_llm_step({"message": ticket.message}, response)
+        state.response = response
 
-        return AgentState(ticket=ticket, response=response)
+        return state
 
     def _classify(self, ticket: SupportTicket) -> TicketClassification | None:
         """Classify before the loop.
@@ -242,6 +273,68 @@ class SupportAgent:
         )
         return result.classification
 
+    def _evaluate_refund(
+        self, ticket: SupportTicket, classification: TicketClassification | None
+    ) -> RefundEvaluationResult | None:
+        """Детерминированная оценка возврата политикой (без LLM).
+
+        Результат записывается в trace (шаг POLICY_DECISION), передаётся в
+        контекст модели и определяет детерминированную refund-часть итогового
+        ответа. Решение принимает политика, а не LLM: оценка не выдаёт
+        полномочий и не меняет context/policy/доступные инструменты. Сбои не
+        прерывают прогон и не превращаются в ALLOW. Для нерелевантных
+        обращений (NOT_APPLICABLE) шаг не пишется и возвращается None.
+        """
+
+        if self.refund_evaluator is None:
+            return None
+
+        started_at = datetime.now(UTC)
+        try:
+            result: RefundEvaluationResult = self.refund_evaluator.evaluate(
+                ticket, classification
+            )
+        except Exception:
+            # Текст исключения в trace не пишем.
+            result = RefundEvaluationResult(
+                status=RefundEvaluationStatus.POLICY_ERROR,
+                reason_code="refund_evaluation_error",
+            )
+
+        if result.status == RefundEvaluationStatus.NOT_APPLICABLE:
+            return None
+
+        decision = result.decision
+        finished_at = datetime.now(UTC)
+        self.run_manager.record(
+            AgentStepType.POLICY_DECISION,
+            input={"refund_evaluation": True},
+            output={
+                "status": result.status.value,
+                "decision": decision.decision.value if decision else None,
+                "reason_code": result.reason_code,
+                "policy_version": decision.policy_version if decision else None,
+                "order_id": result.order_id,
+                "days_since_delivery": (
+                    decision.days_since_delivery if decision else None
+                ),
+                "provenance": result.provenance,
+            },
+            error=(
+                result.reason_code
+                if result.status
+                in (
+                    RefundEvaluationStatus.FACTS_UNAVAILABLE,
+                    RefundEvaluationStatus.POLICY_ERROR,
+                )
+                else None
+            ),
+            started_at=started_at,
+            finished_at=finished_at,
+            duration_ms=(finished_at - started_at).total_seconds() * 1000,
+        )
+        return result
+
     def _record_classification_error(
         self, input_payload: dict, started_at: datetime, error: str, *, output: dict
     ) -> None:
@@ -258,16 +351,21 @@ class SupportAgent:
 
     @staticmethod
     def _build_initial_input(
-        ticket: SupportTicket, classification: TicketClassification | None
+        ticket: SupportTicket,
+        classification: TicketClassification | None,
+        refund_result: RefundEvaluationResult | None = None,
     ):
-        if classification is None:
+        context = []
+        if classification is not None:
+            context.append(format_classification_context(classification))
+        if refund_result is not None:
+            context.append(build_policy_context(refund_result))
+
+        if not context:
             return ticket.message
 
         return [
-            {
-                "role": "developer",
-                "content": format_classification_context(classification),
-            },
+            *({"role": "developer", "content": c} for c in context),
             {"role": "user", "content": ticket.message},
         ]
 
@@ -283,14 +381,18 @@ class SupportAgent:
         self._record_llm_step({"tool_outputs": tool_outputs}, self.state.response)
 
     def _finish(self) -> str:
-        self.run_manager.record(
-            AgentStepType.FINAL,
-            output={"answer": self.state.response.output_text},
-        )
+        llm_text = self.state.response.output_text
+        answer, dropped = compose_final_answer(self.refund_result, llm_text)
+
+        output: dict[str, object] = {"answer": answer}
+        if self.refund_result is not None:
+            output["refund_llm_text_dropped"] = dropped
+
+        self.run_manager.record(AgentStepType.FINAL, output=output)
 
         self.run_manager.complete()
 
-        return self.state.response.output_text
+        return answer
 
     def _call_model(self, model_input, *, previous_response_id: str | None = None):
         kwargs = {"model": MODEL_NAME, "input": model_input}
