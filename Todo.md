@@ -1,6 +1,10 @@
 # TODO
 
 > Легенда: `[x]` готово, `[~]` частично, `[ ]` не начато.
+>
+> Детальные планы открытых задач оформлены как Story Backlog: `.monolith/context/planned/`
+> (сводка — раздел «Story Backlog» в `.monolith/context/maps/roadmap-index.md`). Это планы, не
+> активные Stories; статусы чекбоксов ниже не менялись.
 
 ## Agent Core
 

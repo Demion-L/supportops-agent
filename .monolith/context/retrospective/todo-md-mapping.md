@@ -42,6 +42,12 @@ Verified against Todo.md as of 2026-11-04 (file is itself modified/uncommitted).
    filter; scope overlap must be settled by the owner before SEC-003 is activated.
 4. POLICY-001/002 IDs do not appear in Todo.md; only POLICY-003 and AUTH-001/002 do.
 
+## Historical note (added by SUPPORTOPS-BACKLOG-002)
+
+At the time of the Historical Bootstrap, Agent Architecture research was not attached to any Phase
+(see the table above, which is left unchanged). In SUPPORTOPS-BACKLOG-001 it is planned as
+SUPPORTOPS-EVAL-003 in Phase 6.
+
 ## Not created
 No new IDEA records were created. Candidates the owner may later capture with `monolith idea add`:
 LangGraph/MCP evaluation (Agent Architecture), cost tracking from token usage.

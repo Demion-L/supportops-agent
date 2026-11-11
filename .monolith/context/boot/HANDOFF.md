@@ -44,13 +44,24 @@ reconstruct project context without faking history.
 
 ---
 
+## Story Backlog (SUPPORTOPS-BACKLOG-001)
+
+14 Stories in Phases 3–7 are registered as planning documents in `context/planned/`
+(index: "Story Backlog" in `context/maps/roadmap-index.md`). All are proposals: none is active,
+no Missions were created, nothing is finalized. Todo.md links to the backlog; its checkboxes are unchanged.
+
+---
+
 ## Next Step
 
-Owner decides: (1) review and commit the documentation changes (Commit 2); the Phase 3 code is already committed in `b5f866c`, (2) answer the open questions in
-`context/planned/SUPPORTOPS-SEC-003.md`, (3) approve activation of SEC-003.
+Owner decides: (1) review the Story Backlog documents and commit them, (2) answer the open questions in
+`context/planned/SUPPORTOPS-SEC-003.md`, (3) approve activation of SEC-003 (or another Story).
+The bootstrap documentation is already committed (`2f382d1`); Phase 3 code is in `b5f866c`.
 
 ---
 
 ## Files in Flight
 
-None (all documentation edits complete). Application code is committed in `b5f866c`; the documentation changes are pending Commit 2.
+Uncommitted documentation from SUPPORTOPS-BACKLOG-001: 13 new files in `context/planned/`,
+edits to `SUPPORTOPS-SEC-003.md`, `roadmap-index.md`, `retrospective/todo-md-mapping.md` (historical note),
+this file and `Todo.md` (BACKLOG-002 also touched EVAL-003 wording). Application code is committed.

@@ -70,7 +70,9 @@ The seven-phase structure is the owner's; do not change count or order without a
 
 **Status:** PLANNED (partial artifacts exist)
 - Goal: measurable agent behavior and regression safety.
-- Scope: eval dataset, resolve/escalate and security scenarios, regression and reliability evaluation.
+- Scope: eval dataset, resolve/escalate and security scenarios, regression and reliability evaluation,
+  and the architecture research needed to evaluate and evolve the agent (SUPPORTOPS-EVAL-003:
+  research only, no migration; not a general architecture-refactoring phase).
 - Existing partial work: classification dataset + script; authority-claim unit tests; IDEA-001.
 
 ### Phase 7 — API & Production
@@ -78,6 +80,35 @@ The seven-phase structure is the owner's; do not change count or order without a
 **Status:** PLANNED
 - Goal: operable service. Scope: API layer, configuration, logging, security boundaries,
   operational readiness. The project is **not** production-ready.
+
+---
+
+## Story Backlog
+
+Registered by SUPPORTOPS-BACKLOG-001 as planning documents in `context/planned/`. All are
+proposals: none is active, none has Missions, none is finalized. Proposed Missions are a plan
+inside each document, not records in MONOLITH. Phase statuses above are unchanged.
+
+| Phase | Story | Title | Status | Proposed Missions |
+| ----- | ----- | ----- | ------ | ----------------- |
+| 3 | [SUPPORTOPS-SEC-003](../planned/SUPPORTOPS-SEC-003.md) | Object-Level Authorization & Response Fail-Closed | PREPARED, NOT ACTIVATED | 4 |
+| 3 | [SUPPORTOPS-SEC-004](../planned/SUPPORTOPS-SEC-004.md) | Security Evaluation & Policy Boundary Hardening | PLANNED | 4 |
+| 4 | [SUPPORTOPS-ACT-001](../planned/SUPPORTOPS-ACT-001.md) | Ticket Lifecycle & Decision Model | PLANNED | 4 |
+| 4 | [SUPPORTOPS-ACT-002](../planned/SUPPORTOPS-ACT-002.md) | Human Escalation Workflow | PLANNED | 4 |
+| 4 | [SUPPORTOPS-ACT-003](../planned/SUPPORTOPS-ACT-003.md) | Action Execution & Approval Workflow | PLANNED | 4 |
+| 4 | [SUPPORTOPS-ACT-004](../planned/SUPPORTOPS-ACT-004.md) | Audit Trail & Action Accountability | PLANNED | 4 |
+| 5 | [SUPPORTOPS-STATE-001](../planned/SUPPORTOPS-STATE-001.md) | Persistent Agent State | PLANNED | 4 |
+| 5 | [SUPPORTOPS-STATE-002](../planned/SUPPORTOPS-STATE-002.md) | Run Recovery & Durable Execution | PLANNED | 4 |
+| 6 | [SUPPORTOPS-EVAL-001](../planned/SUPPORTOPS-EVAL-001.md) | Agent Evaluation Dataset | PLANNED | 4 |
+| 6 | [SUPPORTOPS-EVAL-002](../planned/SUPPORTOPS-EVAL-002.md) | Automated Agent Evaluation | PLANNED | 4 |
+| 6 | [SUPPORTOPS-EVAL-003](../planned/SUPPORTOPS-EVAL-003.md) | Agent Architecture Research (research Story) | PLANNED | 4 |
+| 7 | [SUPPORTOPS-API-001](../planned/SUPPORTOPS-API-001.md) | FastAPI Service Layer | PLANNED | 4 |
+| 7 | [SUPPORTOPS-API-002](../planned/SUPPORTOPS-API-002.md) | Production Configuration & Observability | PLANNED | 4 |
+| 7 | [SUPPORTOPS-API-003](../planned/SUPPORTOPS-API-003.md) | Production Security & Deployment | PLANNED | 4 |
+
+Note: Agent Architecture research (EVAL-003) is placed in Phase 6 (owner decision); the Phase 6
+scope above now names it. `retrospective/todo-md-mapping.md` keeps its historical "no phase"
+record, with a short explanatory note.
 
 ---
 

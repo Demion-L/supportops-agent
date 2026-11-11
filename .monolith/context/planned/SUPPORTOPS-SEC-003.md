@@ -46,3 +46,17 @@ ticket owner, and make failures in classification fail closed rather than degrad
 
 ## Out of scope
 Escalation workflow, persistence, API, evaluation dataset (Phases 4–7).
+
+## Proposed Missions
+Plan only (added by SUPPORTOPS-BACKLOG-001). No Missions exist in MONOLITH for this Story. A Mission
+does not complete the Story; alpha.3 has no automatic Story↔Mission link. The open questions above
+remain unresolved owner decisions; nothing here approves any of them.
+
+| # | Mission | Intended outcome |
+| --- | --- | --- |
+| SEC003-M01 | Security Architecture & Trust Boundaries | settle the open questions with the owner and document trust boundaries |
+| SEC003-M02 | Object-Level Authorization | ownership checks for the three lookup tools |
+| SEC003-M03 | Classification Fail-Closed | owner-approved fail-closed outcome for classification errors |
+| SEC003-M04 | Security Regression & Review | regression tests and security review |
+
+Follow-on Story: [SUPPORTOPS-SEC-004](SUPPORTOPS-SEC-004.md) (security evaluation; does not duplicate the criteria above).
