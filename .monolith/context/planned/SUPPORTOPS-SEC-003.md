@@ -6,9 +6,8 @@ authority: proposal
 
 # SUPPORTOPS-SEC-003 — Object-Level Authorization & Response Fail-Closed
 
-**Status: PREPARED, NOT ACTIVATED.** Not in `active.md`, not in `story-index.md`, no finalize
-command run. Activation requires explicit owner approval (and then a structured
-`## Current Story` block in `active.md`). Phase: 3 — Safety & Policy.
+**Status: ACTIVE (not finalized).** Activated by owner approval; recorded in `active.md`
+(`## Current Story`). Not in `story-index.md`, no finalize command run. Phase: 3 — Safety & Policy.
 
 ## Objective
 Make every tool that returns customer/order data verify that the object belongs to the trusted

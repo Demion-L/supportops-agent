@@ -45,7 +45,7 @@ The seven-phase structure is the owner's; do not change count or order without a
   customer/order tools; classification and response failures fail closed; security regression tests.
 - Evidence: [phase-3](../retrospective/phase-3-safety-and-policy.md). Historical (non-native) items:
   Classification, AUTH-001/002 (committed earlier), POLICY-001/002/003 (uncommitted at Historical Bootstrap; later committed within the combined checkpoint commit `b5f866c`, together with Classification, Authorization and Refund Policy — not as separate per-task commits).
-- Next planned story: `SUPPORTOPS-SEC-003` — prepared, **not activated**
+- Active story: `SUPPORTOPS-SEC-003` — **activated**, not finalized
   ([scope](../planned/SUPPORTOPS-SEC-003.md)).
 - Limitations: ownership only for refund evaluation; classification failure degrades open.
 
@@ -91,7 +91,7 @@ inside each document, not records in MONOLITH. Phase statuses above are unchange
 
 | Phase | Story | Title | Status | Proposed Missions |
 | ----- | ----- | ----- | ------ | ----------------- |
-| 3 | [SUPPORTOPS-SEC-003](../planned/SUPPORTOPS-SEC-003.md) | Object-Level Authorization & Response Fail-Closed | PREPARED, NOT ACTIVATED | 4 |
+| 3 | [SUPPORTOPS-SEC-003](../planned/SUPPORTOPS-SEC-003.md) | Object-Level Authorization & Response Fail-Closed | ACTIVE (not finalized) | 4 |
 | 3 | [SUPPORTOPS-SEC-004](../planned/SUPPORTOPS-SEC-004.md) | Security Evaluation & Policy Boundary Hardening | PLANNED | 4 |
 | 4 | [SUPPORTOPS-ACT-001](../planned/SUPPORTOPS-ACT-001.md) | Ticket Lifecycle & Decision Model | PLANNED | 4 |
 | 4 | [SUPPORTOPS-ACT-002](../planned/SUPPORTOPS-ACT-002.md) | Human Escalation Workflow | PLANNED | 4 |
@@ -115,7 +115,7 @@ record, with a short explanatory note.
 ## Current Focus
 
 Active Phase: Phase 3 — Safety & Policy
-Active Story: none
+Active Story: SUPPORTOPS-SEC-003 (activated; not finalized)
 
 ---
 

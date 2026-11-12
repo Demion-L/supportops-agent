@@ -16,7 +16,7 @@ Update this file at the end of each work session before closing.
 
 ## Active Story
 
-None. SUPPORTOPS-SEC-003 is prepared but NOT activated (needs owner approval).
+SUPPORTOPS-SEC-003 (activated by owner approval; not finalized). Current Mission: SEC003-M01 (analysis only).
 
 ---
 
