@@ -2,7 +2,7 @@ from supportops_agent.tools import lookup_customer, lookup_order
 
 
 def test_lookup_customer_returns_customer():
-    customer = lookup_customer("customer_001")
+    customer = lookup_customer("customer_001", trusted_customer_id="customer_001")
 
     assert customer == {
         "customer_id": "customer_001",

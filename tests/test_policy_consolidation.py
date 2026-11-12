@@ -270,13 +270,13 @@ def test_order_model_dump_preserves_delivered_at_and_roundtrips():
 
 
 def test_lookup_order_public_contract_is_stable():
-    out = tool_run("lookup_order", order_id="order_001").output
+    out = tool_run("lookup_order", "customer_001", order_id="order_001").output
     assert out == {
         "order_id": "order_001", "customer_id": "customer_001", "status": "delivered",
         "amount_cents": 12999, "currency": "EUR", "created_at": "2026-07-20",
     }
     assert list(out) == ["order_id", "customer_id", "status", "amount_cents", "currency", "created_at"]
-    assert tool_run("lookup_order", order_id="nope").output is None
+    assert tool_run("lookup_order", "customer_001", order_id="nope").output is None
 
 
 def test_new_domain_fields_do_not_leak_through_lookup_order():
@@ -462,9 +462,12 @@ def test_default_evaluator_uses_trusted_components():
     assert isinstance(ev.engine, RefundPolicyEngine)
 
 
-def test_executor_flag_only_on_refund_tool():
+def test_executor_flag_on_identity_bound_tools():
     flagged = {n for n, d in TOOL_REGISTRY.items() if d.requires_trusted_identity}
-    assert flagged == {"check_refund_eligibility"}
+    # SEC-003/M02: к refund-инструменту добавлены три инструмента чтения клиентских данных
+    assert flagged == {
+        "check_refund_eligibility", "lookup_order", "lookup_customer", "get_order_tracking",
+    }
 
 
 def test_authorization_gate_still_blocks_refund_tool_when_not_allowed():

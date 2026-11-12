@@ -16,7 +16,9 @@ def test_execute_lookup_customer():
         arguments={"customer_id": "customer_001"},
     )
 
-    result = execute_tool_call(call, support_agent_context())
+    result = execute_tool_call(
+        call, support_agent_context(), trusted_customer_id="customer_001"
+    )
 
     assert result.call_id == "test_customer"
     assert result.name == "lookup_customer"
@@ -34,7 +36,9 @@ def test_execute_lookup_order():
         arguments={"order_id": "order_001"},
     )
 
-    result = execute_tool_call(call, support_agent_context())
+    result = execute_tool_call(
+        call, support_agent_context(), trusted_customer_id="customer_001"
+    )
 
     assert result.call_id == "test_order"
     assert result.name == "lookup_order"
@@ -65,7 +69,9 @@ def test_lookup_order_returns_none_for_unknown_order():
         arguments={"order_id": "order_999"},
     )
 
-    result = execute_tool_call(call, support_agent_context())
+    result = execute_tool_call(
+        call, support_agent_context(), trusted_customer_id="customer_001"
+    )
 
     assert result.call_id == "test_unknown_order"
     assert result.name == "lookup_order"
@@ -136,7 +142,7 @@ def test_tool_call_rejects_unknown_tool_name():
 
 
 def test_tool_execution_error_is_returned_as_result(monkeypatch):
-    def failing_tool(order_id: str):
+    def failing_tool(order_id: str, *, trusted_customer_id=None):
         raise RuntimeError("database connection failed")
 
     monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", failing_tool)
@@ -147,7 +153,9 @@ def test_tool_execution_error_is_returned_as_result(monkeypatch):
         arguments={"order_id": "order_001"},
     )
 
-    result = execute_tool_call(call, support_agent_context())
+    result = execute_tool_call(
+        call, support_agent_context(), trusted_customer_id="customer_001"
+    )
 
     assert result.call_id == "test_failing_order"
     assert result.name == "lookup_order"

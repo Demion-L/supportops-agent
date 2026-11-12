@@ -23,10 +23,50 @@ def serialize_order_for_tool(order: OrderRecord) -> dict[str, object]:
     return {name: full[name] for name in ORDER_PUBLIC_FIELDS}
 
 
-def lookup_order_for_tool(order_id: str) -> dict[str, object] | None:
-    """Handler инструмента lookup_order: явная сериализация на границе."""
+def _identity_required() -> dict[str, object]:
+    """Фиксированный отказ без доверенной identity.
+
+    Не зависит от существования объекта и не содержит данных: безопасен для LLM.
+    """
+
+    return {"outcome": "identity_verification_required"}
+
+
+def _normalize_identity(trusted_customer_id: object) -> str | None:
+    """Непустая доверенная identity или None (-> DENY). Источник доверия — вызывающее приложение."""
+
+    if not isinstance(trusted_customer_id, str):
+        return None
+    return trusted_customer_id.strip() or None
+
+
+def get_owned_order(order_id: str, trusted_customer_id: str | None) -> OrderRecord | None:
+    """Заказ, принадлежащий доверенному клиенту, иначе None.
+
+    Единая точка object-level проверки (SEC-003 / M02). None возвращается без
+    различия для: нет identity, несуществующего заказа и чужого заказа — поэтому
+    наличие чужого объекта нельзя определить по результату.
+    """
+
+    identity = _normalize_identity(trusted_customer_id)
+    if identity is None:
+        return None
 
     order = lookup_order(order_id)
+    if order is None or order.customer_id != identity:
+        return None
+    return order
+
+
+def lookup_order_for_tool(
+    order_id: str, *, trusted_customer_id: str | None = None
+) -> dict[str, object] | None:
+    """Handler инструмента lookup_order: ownership, затем явная сериализация."""
+
+    if _normalize_identity(trusted_customer_id) is None:
+        return _identity_required()
+
+    order = get_owned_order(order_id, trusted_customer_id)
     return None if order is None else serialize_order_for_tool(order)
 
 
@@ -40,21 +80,43 @@ def lookup_order(order_id: str) -> OrderRecord | None:
 
     return ORDERS.get(normalized_order_id)
 
-def lookup_customer(customer_id: str) -> dict[str, str] | None:
-    """Return a customer by ID, or None when the customer does not exist."""
+def lookup_customer(
+    customer_id: str, *, trusted_customer_id: str | None = None
+) -> dict[str, object] | None:
+    """Return the trusted customer's own profile.
+
+    Чужой и несуществующий профиль -> None (неразличимо). Без доверенной
+    identity профиль не читается.
+    """
+
+    identity = _normalize_identity(trusted_customer_id)
+    if identity is None:
+        return _identity_required()
 
     normalized_customer_id = customer_id.strip()
 
     if not normalized_customer_id:
         raise ValueError("customer_id must not be empty")
 
-    return CUSTOMERS.get(normalized_customer_id)
+    if normalized_customer_id != identity:
+        return None
+
+    profile = CUSTOMERS.get(normalized_customer_id)
+    return None if profile is None else dict(profile)
 
 
-def get_order_tracking(order_id: str) -> dict[str, object]:
-    """Return shipment tracking for an order as a structured business outcome."""
+def get_order_tracking(
+    order_id: str, *, trusted_customer_id: str | None = None
+) -> dict[str, object]:
+    """Return shipment tracking for the trusted customer's own order.
 
-    order = lookup_order(order_id)
+    Чужой и несуществующий заказ -> order_not_found (неразличимо).
+    """
+
+    if _normalize_identity(trusted_customer_id) is None:
+        return _identity_required()
+
+    order = get_owned_order(order_id, trusted_customer_id)
 
     if order is None:
         return {"outcome": "order_not_found", "order_id": order_id.strip()}

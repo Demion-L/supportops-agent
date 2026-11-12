@@ -87,12 +87,14 @@ _DEFINITIONS = [
         description="Look up an order by its order ID and return its current status and details.",
         arguments_model=LookupOrderArguments,
         handler=lookup_order_for_tool,
+        requires_trusted_identity=True,
     ),
     ToolDefinition(
         name="lookup_customer",
         description="Look up a customer by their customer ID and return their details.",
         arguments_model=LookupCustomerArguments,
         handler=lookup_customer,
+        requires_trusted_identity=True,
     ),
     ToolDefinition(
         name="get_order_tracking",
@@ -103,6 +105,7 @@ _DEFINITIONS = [
         ),
         arguments_model=GetOrderTrackingArguments,
         handler=get_order_tracking,
+        requires_trusted_identity=True,
     ),
     ToolDefinition(
         name="check_refund_eligibility",

@@ -37,7 +37,7 @@ def run(name, trusted_customer_id=None, **arguments):
 # --- get_order_tracking -----------------------------------------------------
 
 def test_tracking_found_for_shipped_order():
-    result = run("get_order_tracking", order_id="order_002")
+    result = run("get_order_tracking", "customer_002", order_id="order_002")
     assert result.error is None
     assert result.output == {
         "outcome": "tracking_found",
@@ -51,12 +51,12 @@ def test_tracking_found_for_shipped_order():
 
 
 def test_tracking_not_shipped_and_no_shipment():
-    assert run("get_order_tracking", order_id="order_003").output["outcome"] == "not_shipped"
-    assert run("get_order_tracking", order_id="order_004").output["outcome"] == "no_shipment"
+    assert run("get_order_tracking", "customer_003", order_id="order_003").output["outcome"] == "not_shipped"
+    assert run("get_order_tracking", "customer_004", order_id="order_004").output["outcome"] == "no_shipment"
 
 
 def test_tracking_unknown_order_is_business_outcome_not_error():
-    result = run("get_order_tracking", order_id="order_999")
+    result = run("get_order_tracking", "customer_001", order_id="order_999")
     assert result.error is None
     assert result.output == {"outcome": "order_not_found", "order_id": "order_999"}
 
@@ -188,8 +188,8 @@ def test_handler_crash_becomes_execution_failure(monkeypatch, name, arguments):
 
 
 def test_non_serializable_output_is_execution_failure(monkeypatch):
-    monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", lambda order_id: {"d": object()})
-    result = run("lookup_order", order_id="order_001")
+    monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", lambda order_id, **_: {"d": object()})
+    result = run("lookup_order", "customer_001", order_id="order_001")
     assert result.output is None and result.error_type == "execution_failed"
 
 
@@ -200,11 +200,11 @@ def test_results_are_json_serializable():
         ("check_refund_eligibility", {"order_id": "order_001"}),
         ("create_support_case", {"ticket_id": "t", "reason": "r", "priority": "low"}),
     ]:
-        json.dumps(run(name, **args).model_dump(mode="json"))
+        json.dumps(run(name, "customer_001", **args).model_dump(mode="json"))
 
 
 def test_successful_result_has_no_error_type():
-    assert run("lookup_order", order_id="order_001").error_type is None
+    assert run("lookup_order", "customer_001", order_id="order_001").error_type is None
 
 
 # --- registry, schemas, descriptions -----------------------------------------

@@ -374,6 +374,32 @@ Acceptance Criteria SEC-003 и findings F-1..F-9 не изменены.
 - **Scope:** вне SEC-003. **Risks:** до ACT-003 модель может открыть кейс для произвольного `ticket_id`.
 - **Закрывает:** часть Q7. Status: APPROVED.
 
+### K5-R1. Missing Identity Response (уточнение K5)
+- **Decision ID:** K5-R1. **Status:** APPROVED (решение владельца; K1–K5 и D1–D4 не изменены).
+- **Decision:** отсутствие trusted identity (`None`, пустая строка, строка из пробелов, не-`str`)
+  возвращает фиксированный `{"outcome": "identity_verification_required"}`. Остальные исходы:
+  свой объект — данные; чужой и несуществующий — `None` / `order_not_found`.
+- **Rationale:** отсутствие identity отличается от отсутствия права на конкретный объект;
+  результат не должен раскрывать существование объекта.
+- **Scope:** три защищённых lookup-инструмента (`lookup_order`, `lookup_customer`, `get_order_tracking`).
+- **Security invariant:** результат не зависит от запрошенного объекта и формируется до
+  обращения к хранилищу (`tools.py::_identity_required`; тесты `test_object_authorization.py`).
+
+### Отложенные findings независимого ревью M02 (не исправляются в M02)
+- **NB-1 / F-8:** `ticket.customer_id` не верифицируется кодом; теперь он гейтит чтение PII.
+  Закрывается интеграцией SUPPORTOPS-API-003.
+- **NB-2:** разная нормализация identity: lookup-инструменты применяют `strip()`
+  (`tools.py::_normalize_identity`), refund-цепочка (`check_refund_eligibility`,
+  `evaluate_order`) — нет. Отказ в безопасную сторону (refund строже); через `SupportTicket`
+  недостижимо (`str_strip_whitespace`). Унификация — M04.
+- **NB-3:** ownership-сравнение дублируется (`tools.py::get_owned_order` и
+  `refund_evaluation.py::evaluate_order`); K3 допускает, семантика refund не менялась. Решение — M04.
+- **NB-7 / D3:** `str(exc)` handler'а уходит в LLM (`tool_executor.py`); M04 / SEC-004.
+- **F-7:** `create_support_case(ticket_id)` — ACT-003 (см. D4).
+- **Не гарантируется кодом (NOT GUARANTEED):** финальный ответ агента определяет LLM;
+  `compose_final_answer` фильтрует только refund-тематику. Детерминированной гарантии, что
+  LLM не представит `identity_verification_required` как успешную проверку, нет (D1: SEC-004).
+
 ## 15. SEC003-M02 Implementation Plan (MONOLITH `MIS-0002`)
 
 **Статус: PLAN.** Реализация не начата и требует отдельной команды владельца. Основание: утверждённые

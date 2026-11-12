@@ -138,7 +138,7 @@ def test_agent_executes_tool_and_returns_final_answer():
 
 
 def test_agent_returns_tool_error_to_model(monkeypatch):
-    def failing_tool(order_id: str):
+    def failing_tool(order_id: str, *, trusted_customer_id=None):
         raise RuntimeError("database connection failed")
 
     from supportops_agent.tool_executor import TOOL_REGISTRY
@@ -812,7 +812,7 @@ def test_tool_execution_step_records_latency(monkeypatch):
 
     from supportops_agent.tool_executor import TOOL_REGISTRY
 
-    def slow_lookup_order(order_id: str):
+    def slow_lookup_order(order_id: str, *, trusted_customer_id=None):
         time.sleep(0.02)
         return {"order_id": order_id, "status": "delivered"}
 
