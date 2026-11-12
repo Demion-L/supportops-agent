@@ -427,3 +427,79 @@ K2–K5, D2 (§14). Факты кода проверены чтением `tools
 **Evidence для завершения M02:** новые тесты падают до изменения и проходят после; полный `pytest` зелёный (было 295 passed); `git diff` затрагивает только `tools.py`, `tool_definitions.py` (возможно `refund_facts.py`/`refund_evaluation.py`) и тесты; контракт Gate (`authorization.py`, `tool_executor.py`) не изменён.
 
 **Риски:** массовое обновление тестов; случайное изменение `ORDER_PUBLIC_FIELDS`; расхождение ownership-логики с refund-цепочкой; доверие к `ticket.customer_id` до API-003 (F-8).
+
+## 16. SEC003-M03 Implementation Plan (MONOLITH `MIS-0003`)
+
+**Статус: PLAN.** Реализация не начата и требует отдельной команды владельца. Основание: утверждённое K1 (§14), D1.
+Критерии приёмки SEC-003 не меняются. Контракт K1: при ожидаемой `ClassificationError` LLM-цикл и
+инструменты не запускаются; клиент получает детерминированный ответ; trace отражает degraded;
+refund не подтверждается; неожиданные исключения — по-прежнему FAILED.
+
+**1. Анализ текущего pipeline (факты кода):**
+- `agent.py::_classify` возвращает `None` в трёх разных случаях: классификатор не задан (`classifier is None`, легитимный режим «как раньше»), ожидаемая `ClassificationError` (шаг CLASSIFICATION с `error`, `output={"fallback": True}`), успех не возвращает `None`. Различать «отключён» и «сбой» по `None` нельзя — нужен явный сигнал.
+- `_start` после `_classify` безусловно вызывает `_evaluate_refund` и `_call_model` → LLM-цикл с полным набором инструментов.
+- Неожиданное исключение: trace `unexpected_error` + re-raise → `run()` → `run_manager.fail()` (FAILED). Не менять.
+- `summary()["classification_failed"]` уже выводится из `error` в шагах CLASSIFICATION.
+
+**2. Точки перехвата:** `_classify` (различить сбой) и `_run_agent_loop/_start` (не вызывать `_call_model`, вернуть через финальный путь). Минимальный вариант: `_classify` сигнализирует сбой (например, внутренний флаг/исключение внутри `agent.py`), `_start` не создаёт LLM-ответ; новый метод завершает прогон. `run()` по-прежнему возвращает `str`.
+
+**3. Fallback-ответ:** фиксированный текст из K1: «Не удалось автоматически обработать ваш запрос. Пожалуйста, обратитесь в службу поддержки». Константа в `agent.py` или `refund_response.py`-соседнем модуле; не зависит от LLM и от текста тикета.
+
+**4. Trace и status:** шаг CLASSIFICATION как сейчас (error + fallback) плюс шаг FINAL с `degraded: true` и ответом; `AgentRunStatus` без изменений (COMPLETED + `degraded`). Проверить, что `summary()` явно показывает `degraded`/`classification_failed`, чтобы COMPLETED не читался как успех.
+
+**5. Защита от инструментов:** после сбоя не вызывается `client.responses.create`, поэтому не исполняется ни один tool call; `_evaluate_refund` не вызывается (refund не подтверждается и не оценивается).
+
+**6. Регрессионные тесты:**
+- Обновить, осознанно, тесты «run continues»: `test_classification.py::test_agent_classification_failure_is_traced_and_run_continues`, `test_refund_evaluation.py::test_classification_fallback_does_not_evaluate_and_run_continues`, `test_authorization.py::test_e_*`, `test_f1_c_*`.
+- Новые: оба `kind` (`api_error`, `invalid_output`) → ответ равен константе, 0 вызовов `responses.create`, 0 вызовов инструментов, trace содержит CLASSIFICATION(error) и FINAL(degraded), `summary` показывает сбой; неожиданное исключение → FAILED + re-raise; `classifier=None` → поведение не изменилось; refund-тема при сбое не даёт подтверждения и `refund_result is None`.
+
+**7. Совместимость с refund pipeline:** `evaluate` и так возвращает `NOT_APPLICABLE` при `classification is None`; при fail-closed он не вызывается вовсе. Отдельный тест, что `compose_final_answer` не применяется к degraded-ответу.
+
+**8. Acceptance Criteria / Evidence:** ошибка классификации → LLM не вызывается (счётчик вызовов fake-клиента = 0); ответ детерминирован; trace/summary отражают degraded; неожиданные ошибки → FAILED; `classifier=None` без изменений; Gate/executor/`tools.py` не менялись; полный `pytest` зелёный (≥ 383 + новые); `git diff` затрагивает `agent.py` (и, возможно, модуль с константой) и тесты.
+
+**Вне scope M03:** общий response fail-closed (D1/SEC-004), F-6/D3, F-7, F-8, любое изменение Gate/ToolExecutor/ownership.
+
+**Открытые вопросы владельцу:**
+1. Как `_classify` должен сигнализировать сбой: внутреннее исключение/флаг в `agent.py` (рекомендуется, без публичных изменений) или изменение возвращаемого типа?
+2. Нужен ли отдельный видимый признак в `summary()` (например, `degraded`) помимо `classification_failed`? (рекомендуется да)
+3. Язык фиксированного ответа: русский текст из K1 как есть или локализация/английский вариант?
+4. Тест `classifier=None` остаётся «как раньше» (fail-open без классификатора) — подтвердить, что это не считается дырой.
+
+### M03 Owner Decisions (утверждены владельцем перед реализацией)
+
+**Статус: M03-D1…D5 — APPROVED.** Решения закрывают открытые вопросы §16 (1–4). K1–K5, D1–D4 и
+Acceptance Criteria SEC-003 не изменены; ADR не создаётся.
+
+```text
+M03 Owner Decisions
+M03-D1: APPROVED
+M03-D2: APPROVED
+M03-D3: APPROVED
+M03-D4: APPROVED
+M03-D5: APPROVED
+```
+
+- **M03-D1 — Classification Failure Signal (закрывает вопрос §16.1).** Ожидаемый `ClassificationError`
+  передаётся из `_classify` в `_start`; используется существующий тип исключения, новый публичный тип
+  и дополнительный mutable flag не вводятся. Контракт: `classifier=None` — продолжить существующий
+  pipeline; успешная классификация — продолжить существующий pipeline; `ClassificationError` —
+  детерминированный fail-closed fallback; неожиданное исключение — существующая семантика FAILED.
+  Перехват — в узкой границе обработки классификации; произвольные ошибки не превращаются
+  в `ClassificationError`.
+- **M03-D2 — Degraded Summary (закрывает вопрос §16.2).** При ожидаемом сбое классификации
+  summary содержит `degraded: true` (вместе с `classification_failed: true`); `AgentRunStatus` не
+  меняется, статус успешного fallback — `completed`. Для неожиданных исключений сохраняется FAILED;
+  `degraded=true` не является универсальным признаком любых ошибок.
+- **M03-D3 — English Fallback (закрывает вопрос §16.3; уточнение литерала K1).** Язык клиентского
+  ответа по умолчанию — английский. Фиксированный текст:
+  `We're unable to process your request right now. Please try again later or contact support.`
+  Это утверждённое уточнение M03-D3: русский литерал из K1 заменяется английским, остальные
+  требования K1 не меняются. Ответ детерминирован, не генерируется LLM, не зависит от содержания
+  тикета, не содержит внутренней диагностики, не утверждает, что заказ проверен или refund одобрен,
+  не обещает выполнения операции. Переводы и локализация в M03 не вводятся.
+- **M03-D4 — Disabled Classifier (закрывает вопрос §16.4).** `classifier=None` не является ошибкой
+  и не считается дырой; существующее поведение сохраняется без изменений, классификатор не
+  становится обязательным. Контракт подтверждается регрессионным тестом.
+- **M03-D5 — Architecture Commit.** План §16 и решения M03-D1…D5 фиксируются отдельным
+  документационным коммитом до реализации; Python-код и тесты в него не входят и остаются
+  незакоммиченными до отдельного решения владельца.
