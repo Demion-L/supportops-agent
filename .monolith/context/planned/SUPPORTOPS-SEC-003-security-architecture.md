@@ -373,6 +373,9 @@ Acceptance Criteria SEC-003 и findings F-1..F-9 не изменены.
 - **Rationale:** запись, вне формального scope трёх lookup-инструментов.
 - **Scope:** вне SEC-003. **Risks:** до ACT-003 модель может открыть кейс для произвольного `ticket_id`.
 - **Закрывает:** часть Q7. Status: APPROVED.
+- **SUPERSEDED (M04-D1, 2026-11-13):** решение выше сохранено как историческая запись и **больше не
+  действует**. Основание — assumption D4 («запись, без раскрытия чужих кейсов») опровергнут
+  Discovery M04. F-7 входит в scope SEC-003; контракт — Trusted Ticket Binding, см. §17.1 и §17.5.
 
 ### K5-R1. Missing Identity Response (уточнение K5)
 - **Decision ID:** K5-R1. **Status:** APPROVED (решение владельца; K1–K5 и D1–D4 не изменены).
@@ -395,7 +398,7 @@ Acceptance Criteria SEC-003 и findings F-1..F-9 не изменены.
 - **NB-3:** ownership-сравнение дублируется (`tools.py::get_owned_order` и
   `refund_evaluation.py::evaluate_order`); K3 допускает, семантика refund не менялась. Решение — M04.
 - **NB-7 / D3:** `str(exc)` handler'а уходит в LLM (`tool_executor.py`); M04 / SEC-004.
-- **F-7:** `create_support_case(ticket_id)` — ACT-003 (см. D4).
+- **F-7:** `create_support_case(ticket_id)` — ACT-003 (см. D4). *(Пересмотрено: D4 superseded M04-D1, F-7 — scope SEC-003, §17.)*
 - **Не гарантируется кодом (NOT GUARANTEED):** финальный ответ агента определяет LLM;
   `compose_final_answer` фильтрует только refund-тематику. Детерминированной гарантии, что
   LLM не представит `identity_verification_required` как успешную проверку, нет (D1: SEC-004).
@@ -503,3 +506,253 @@ M03-D5: APPROVED
 - **M03-D5 — Architecture Commit.** План §16 и решения M03-D1…D5 фиксируются отдельным
   документационным коммитом до реализации; Python-код и тесты в него не входят и остаются
   незакоммиченными до отдельного решения владельца.
+
+## 17. SEC003-M04: Security Hardening Architecture
+
+**Статус: M04-D1…D4 и OQ-1…OQ-6 — APPROVED владельцем (2026-11-13; §17.16); реализация идёт по WP, каждый WP
+требует отдельной команды.** Базовое состояние: коммит `a349d0e`, `pytest` — 420 passed. K1–K5, D1–D3, K5-R1,
+M03-D1…D5 и восемь Acceptance Criteria SEC-003 не изменены; D4 сохранён и помечен superseded (§17.5).
+Идентификаторы решений M04 префиксованы `M04-`, чтобы не путать их со старым D4 (§14).
+Факты ниже проверены чтением кода на `a349d0e`; где подтверждения нет — `NOT VERIFIED`.
+
+### 17.1 M04-D1: Trusted Ticket Binding (F-7 — BLOCKER закрытия SEC-003)
+
+**Подтверждённое поведение (код):** `tools.py::create_support_case(ticket_id, reason, priority)` берёт
+`ticket_id` из аргументов модели (`tool_definitions.py::CreateSupportCaseArguments.ticket_id`); `case_id` =
+`sha256(ticket_id + нормализованный reason)[:10]`; при повторе возвращается `already_exists` с полным
+`SupportCase` (`reason`, `priority`, `status`). Привязки к текущему тикету и identity нет
+(`requires_trusted_identity=False`). Следствия: (а) чтение `reason/priority/status` чужого кейса при
+угаданном `ticket_id` + `reason`; (б) «предсоздание» кейса под чужим `ticket_id` и последующее влияние на
+его состояние; (в) создание кейсов для произвольных тикетов.
+
+**Решение: вариант A.** `ticket_id` — доверенный параметр, не аргумент модели:
+
+```text
+SupportAgent (state.ticket.ticket_id) → ToolExecutor (trusted_ticket_id) → create_support_case
+```
+
+Модель передаёт только `{"reason", "priority"}`. Публичная схема инструмента `ticket_id` не содержит.
+
+**Контракт:**
+- Handler: `create_support_case(reason, priority, *, trusted_ticket_id=None, trusted_customer_id=None)`.
+  Проверки выполняются первыми, до обращения к `mock_data.CASES`.
+- Нет валидной `trusted_customer_id` (`None`, не-`str`, пусто/пробелы; правило `tools.py::_normalize_identity`)
+  → `{"outcome": "identity_verification_required"}` (K5-R1, без изменений).
+- Нет валидного `trusted_ticket_id` (то же правило) → фиксированный `{"outcome": "ticket_context_required"}`.
+  Результат не зависит от `reason`, `priority` и содержимого `CASES`.
+- `case_id` по-прежнему `_case_id(trusted_ticket_id, reason)` → идемпотентность и существующие `case_id` сохраняются.
+- `already_exists` возвращается, только если найденный кейс имеет `case.ticket_id == trusted_ticket_id`. При
+  несовпадении (теоретическая коллизия 40-битного усечения хэша) — тот же фиксированный отказ, без данных.
+- Повторный вызов не меняет `priority`/`status` существующего кейса (поведение сохраняется).
+- Принуждение — на уровне handler (как K3/K5-R1); Executor лишь доставляет значение; Gate и `AuthorizationReason` не меняются.
+
+**Инварианты:** F7-I1…F7-I10 из брифа владельца (см. §17.6).
+
+### 17.2 M04-D2: Exception Sanitization (R1)
+
+**Инвентаризация путей (выведена из кода `a349d0e`; отчёт Discovery после `/clear` недоступен, пять путей
+нужно сверить с ним — см. §17.16 OQ-1):**
+
+| # | Место | Что уходит наружу | Приёмник |
+|---|---|---|---|
+| P1 | `tool_executor.py::execute_tool_call` — `f"Tool '{name}' failed: {exc}"` | `str(exc)` handler'а | `ToolResult.error` → trace `TOOL_EXECUTION.error` → LLM (`agent.build_tool_output`) |
+| P2 | `agent.py::execute_function_call` — `f"Invalid arguments ...: {exc}"` | текст pydantic `ValidationError` (содержит `input_value`, ключи из `extra_forbidden` — данные от LLM) | `ToolResult.error` → trace → LLM |
+| P3 | `agent.py::run` — `run_manager.fail(str(exc))` | `str(exc)` любого исключения прогона (API-клиент, `ValidationError` и т.д.) | trace `FAILURE.error` → `summary()["error"]` |
+| P4 | `agent.py::_classify`, ветка неожиданных — `f"Unexpected classifier error: {type}: {exc}"` | `str(exc)` классификатора | trace `CLASSIFICATION.error` |
+| P5 | `agent.py::execute_function_call` — `raise` для неизвестного инструмента/битого JSON (`ToolCall` → `ValueError("Unknown tool: ...")`/`ValidationError`) | имя инструмента и `input_value` от LLM | попадает в P3 |
+
+Не затронуты (проверено): `_authorize` (только тип, `logger.error` без текста), `_evaluate_refund` (текст не пишется),
+ожидаемый `ClassificationError` (M03: `kind` по allowlist).
+
+**Контракт:** ни один путь не передаёт `str(exc)` в trace, `summary()`, `ToolResult.error`, контекст LLM или
+customer-facing ответ. Диагностика — только:
+1. стабильный код (`invalid_arguments`, `execution_failed`, …);
+2. тип исключения из доверенного набора: `safe_exception_type(exc)` возвращает имя **первого совпавшего
+   базового класса** из закрытого упорядоченного списка (`ValueError`, `TypeError`, `KeyError`, `LookupError`,
+   `RuntimeError`, `OSError`/`ConnectionError`/`TimeoutError`, pydantic `ValidationError`, `json.JSONDecodeError`,
+   `ClassificationError`, исключения `openai` — точный список утверждается в WP2); иначе `"Exception"`. Имя подкласса
+   стороннего кода наружу не попадает;
+3. статус выполнения.
+
+Целевые формы (предложение): P1 → `Tool '<registry name>' failed [execution_failed]` + `ToolResult.diagnostic_type`;
+P2 → `Invalid arguments for tool '<registry name>' [invalid_arguments]` (без деталей pydantic); P3 → `error =
+safe_exception_type(exc)`; единственное исключение — внутренний `AgentStepLimitError(RuntimeError)` со статичным
+сообщением, которое сохраняется как есть; P4 → `Unexpected classifier error: <safe type>`; P5 покрывается P3.
+
+**Семантика:** оригинальное исключение по-прежнему пробрасывается (`raise` без обёртки) — меняется только то, что
+записывается в trace/summary/LLM. M03: ветка `ClassificationError` не меняется. Минимальный scope:
+`agent.py`, `tool_executor.py` и тесты.
+
+### 17.3 M04-D3: Concurrent Run Guard (R2)
+
+**Подтверждённое поведение:** `SupportAgent` хранит изменяемое состояние на экземпляре (`run_manager`, `refund_result`,
+`state`); `run()` присваивает их без защиты. Дискавери воспроизвело смешивание: данные клиента A попадают в контекст
+прогона B. Интерфейс только синхронный (`async`/`await` в `src/` отсутствуют — проверено grep'ом).
+
+**Контракт:** один экземпляр — один активный `run()`.
+- В `__init__`: `self._run_lock = threading.Lock()` (не `RLock`: повторный вход из того же потока должен отклоняться, а не проходить).
+- В `run()` первой операцией, **до** любой мутации (`run_manager`, `refund_result`, `state`) и **вне** `try/except`,
+  который вызывает `run_manager.fail`: `if not self._run_lock.acquire(blocking=False): raise ConcurrentRunError(...)`.
+  Иначе `except Exception` пометил бы FAILED чужой (первый) прогон.
+- `try: …существующая логика… finally: self._run_lock.release()` — освобождение при успехе, исключении и `BaseException`.
+- `ConcurrentRunError(RuntimeError)` — новое публичное исключение, статичное сообщение без `ticket_id`/`customer_id`/текста.
+- Отказ второго прогона не меняет `last_run`, `state`, `refund_result`, trace первого; deadlock невозможен (acquire неблокирующий).
+- Публичные `execute_function_call(s)` — внутренние шаги цикла; защита относится к `run()` (документируется в docstring).
+- Защита per-instance. Разные экземпляры независимы; глобальное `mock_data.CASES` — отдельная проблема (см. §17.11).
+
+### 17.4 M04-D4: AC2 Clarification
+
+Исходный AC2: «Missing/None trusted identity → deny (fail-closed), never allow». **Уточнение:** требование
+распространяется на **все** инструменты, которым нужен доверенный контекст для доступа к клиентским данным или
+выполнения операций. Различаются три сущности, которые не смешиваются:
+
+| Сущность | Источник | Роль |
+|---|---|---|
+| Trusted customer identity | `ticket.customer_id` → `trusted_customer_id` | чей это объект |
+| Trusted ticket identity | `ticket.ticket_id` → `trusted_ticket_id` | в рамках какого обращения идёт операция |
+| LLM-supplied arguments | `function_call.arguments` | только бизнес-параметры; не задают ни одну из двух |
+
+**Нужен ли `trusted_customer_id` в `create_support_case`:** рекомендация — **да** (`requires_trusted_identity=True`).
+Основания: (1) AC2 и K5-R1 применяются к любому инструменту, меняющему клиентские данные; единообразие с остальными четырьмя
+identity-инструментами; (2) fail-closed при отсутствии identity. **Честное ограничение:** ticket и customer приходят из одного
+объекта `SupportTicket`, поэтому проверка *принадлежности тикета клиенту* кодом невозможна (реестра тикетов нет) — ticket binding
+опирается на тот же контракт доверия K5/F-8. Хранение владельца в `SupportCase` — отдельное решение (OQ-2), не принимается здесь.
+Реализация AC2-уточнения — WP1. API-аутентификация не реализуется (§17.12).
+
+### 17.5 Supersession старого D4
+
+| Поле | Значение |
+|---|---|
+| Историческая запись | §14 D4 сохранена без изменений текста; добавлена пометка SUPERSEDED |
+| Superseded by | M04-D1 (§17.1) |
+| Причина | assumption D4 («запись, без раскрытия данных чужих кейсов») опровергнут Discovery M04 |
+| Evidence | `tools.py::create_support_case`: повтор возвращает `already_exists` + `reason/priority/status`; `case_id` выводится из `ticket_id` модели; `tool_definitions.py`: `ticket_id` в `CreateSupportCaseArguments`, `requires_trusted_identity=False` |
+| Новый контракт | Trusted Ticket Binding (§17.1) |
+| Scope | F-7 входит в scope SEC-003 и является BLOCKER закрытия Story |
+| Ownership | F-7 за SEC-003. ACT-003 не получает дублирующую задачу и остаётся Story про approval/action workflow (в `SUPPORTOPS-ACT-003.md` F-7 не фигурировал — правки не требуются) |
+
+### 17.6 Security invariants
+
+- **F7-I1…I10** (бриф владельца): I1 нельзя выбрать чужой `ticket_id`; I2 нельзя подменить через arguments; I3 без валидного
+  trusted ticket — отказ; I4 отказ до чтения/записи; I5 прямой вызов handler не обходит проверку; I6 `already_exists` только для
+  кейса доверенного тикета; I7 идемпотентность; I8 повтор не меняет приоритет; I9 контракт Gate не изменён; I10 RefundPolicyEngine не изменён.
+- **R1-I1…I8:** I1 PII из исключения не в trace; I2 не в `summary()["error"]`; I3 не в LLM-контексте; I4 неожиданные исключения
+  сохраняют FAILED; I5 ожидаемые ошибки классификации сохраняют контракт M03; I6/I7 RefundPolicyEngine и Gate не менялись; I8 тесты с синтетическими PII.
+- **R2-I1…I8:** I1 один активный run; I2 отказ до мутации; I3 первый run завершается корректно; I4 lock освобождается при успехе и исключении;
+  I5 последовательные run работают; I6/I7 нет cross-customer contamination в trace/LLM-контексте; I8 семантика последовательных запусков не меняется.
+- **AC2-I1 (добавлен M04-D4):** для `create_support_case` отсутствие `trusted_customer_id` или `trusted_ticket_id` → отказ до обращения к хранилищу.
+
+### 17.7 Threat model
+
+| Угроза | Вектор | Контроль |
+|---|---|---|
+| T1 Cross-ticket write | LLM (prompt injection) подставляет чужой `ticket_id` | поле удалено из схемы; `extra="forbid"`; значение из `state.ticket` |
+| T2 Cross-ticket read | повтор с чужим `ticket_id`+`reason` → `already_exists` | handler сверяет `case.ticket_id`; чужие кейсы недостижимы |
+| T3 Case pre-seeding | создать запись под чужим ключом заранее | ключ строится только из `trusted_ticket_id` |
+| T4 Handler bypass | прямой вызов handler/подмена kwargs | проверка внутри handler; Executor присваивает `trusted_*` после `model_dump`; тест на отсутствие `trusted_*` в схемах |
+| T5 PII в диагностике | `str(exc)` handler/классификатора/API/pydantic | §17.2: только код + тип из allowlist |
+| T6 Cross-customer state bleed | два потока на одном экземпляре | §17.3: неблокирующий lock |
+| T7 Утечка через сообщение отказа | `ConcurrentRunError`/`ticket_context_required` содержат данные | статичные тексты; результат не зависит от данных |
+
+### 17.8 Trust boundaries (дополнение к §3)
+
+| Граница | Trusted | Untrusted | Изменение M04 |
+|---|---|---|---|
+| B4 Executor → Handler | `trusted_customer_id`, **`trusted_ticket_id`** | `arguments` (`reason`, `priority`) | новый trusted-канал; флаг `requires_trusted_ticket` |
+| B3 LLM → Gate | `ExecutionContext` | `name`, `arguments` | без изменений |
+| B6 Output → LLM/Trace | коды ошибок, `safe_exception_type` | `str(exc)` | санитизация (P1–P5) |
+| B7 (новая) Caller → `SupportAgent.run` | единственный активный run на экземпляр | параллельные вызовы | `_run_lock` |
+| B1 User → Ticket | `ticket_id`, `customer_id` (контракт K5) | `message` | без изменений; верификация — API-003 (F-8) |
+
+### 17.9 Proposed code changes (PROPOSAL — не реализуются на этапе M04-A)
+
+- `tool_definitions.py`: удалить `ticket_id` из `CreateSupportCaseArguments`; добавить `ToolDefinition.requires_trusted_ticket: bool = False`;
+  у `create_support_case` — `requires_trusted_ticket=True`, `requires_trusted_identity=True`; обновить `description`.
+- `tool_executor.py`: `execute_tool_call(..., *, trusted_customer_id=None, trusted_ticket_id=None)`; `trusted_ticket_id` добавляется в `kwargs` только при
+  `requires_trusted_ticket` и **после** `model_dump()`; P1 санитизация; `safe_exception_type`.
+- `tools.py`: handler по §17.1; проверка контекста первой; сверка `case.ticket_id`.
+- `agent.py`: передача `self.state.ticket.ticket_id` (None при отсутствии `state`); P2/P3/P4; `ConcurrentRunError`, `_run_lock`, `AgentStepLimitError`.
+- Совместимость: Gate (`authorization.py`), RefundPolicyEngine (`policy.py`, `refund_*`), `models.py` — без изменений. Затронутые существующие тесты: см. §17.14.
+
+### 17.10 Test strategy
+
+TDD (красные тесты → код); мутационная проверка каждого инварианта (откат фикса → падают целевые тесты); синтетические PII
+(`jane.doe@example.com`, `+1-555-0100`, номер карты-заглушка) во всех R1-тестах; конкурентность — детерминированная, на `threading.Event`
+(без `sleep`): fake-клиент блокируется внутри `responses.create` первого прогона, второй прогон стартует в этот момент. Детали — §17.14.
+
+### 17.11 Remaining risks
+
+1. **F-8** — `ticket.customer_id`/`ticket_id` не аутентифицируются (API-003); M04 фиксирует контракт, не сквозную аутентификацию.
+2. **R5** — достоверность финального ответа LLM (ложные утверждения о возвратах/действиях/личности) — SEC-004.
+3. Исключение, пробрасываемое вызывающему коду (`raise`), по-прежнему содержит оригинальный текст — ответственность приложения; M04 чистит только trace/summary/LLM.
+4. Глобальное `mock_data.CASES` разделяется между экземплярами; для реального backend нужна своя конкурентность (Phase 5). Lock защищает экземпляр, не данные.
+5. Санитизация P2 снижает возможность самокоррекции LLM после неверных аргументов (осознанный компромисс; OQ-3).
+6. Ticket→customer связь не проверяется кодом (нет реестра тикетов) — см. §17.4, OQ-2.
+
+### 17.12 Explicit exclusions
+
+API-003 (аутентификация, F-8) · ACT-003 (approval workflow) · SEC-004 (R5, response validator, расширение keyword-фильтра, authority claims) ·
+изменение Authorization Gate и RefundPolicyEngine · рефакторинг lifecycle `SupportAgent` · RBAC/`TrustedIdentity` · audit trail (ACT-004) · маскировка PII в `message`/trace сверх P1–P5 ·
+async-интерфейс · персистентность.
+
+### 17.13 Closure criteria (SEC003-M04 / Story SEC-003)
+
+1. WP1–WP3 реализованы; все инварианты §17.6 покрыты тестами, подтверждена мутационная проверка.
+2. WP4: M01–M03 инварианты сохранены; матрица cross-tool authorization зелёная; полный `pytest` ≥ 420 + новые, без регрессий.
+3. `git diff` затрагивает только файлы §17.9 и тесты; Gate/RefundPolicyEngine не изменены.
+4. Независимое security-ревью M04 без blocker'ов; F-7 закрыт; R1/R2 закрыты или явно приняты владельцем.
+5. `monolith validate` PASS; решение владельца по коммиту; затем `monolith finalize plan/apply` по digest владельца (закрытие Story — отдельное решение).
+
+### 17.14 Implementation Plan (M04-B/C…) — для утверждения владельцем
+
+Порядок: WP1 → WP2 → WP3 → WP4 (WP1–WP3 независимы по файлам, кроме `agent.py`; изменения в нём делаются последовательно).
+
+**WP1: Trusted Ticket Binding**
+- Файлы: `tool_definitions.py`, `tool_executor.py`, `tools.py`, `agent.py` (передача `ticket_id`); тесты: `test_business_tools.py`, новый `tests/test_trusted_ticket_binding.py`.
+- Контракт: §17.1, §17.4. Инварианты: F7-I1…I10, AC2-I1.
+- Acceptance: схема LLM без `ticket_id`; `{"ticket_id": ...}` в аргументах → `invalid_arguments`; без trusted ticket/customer → фиксированный отказ, `CASES` не тронут; чужой `ticket_id` недостижим; идемпотентность и `case_id` без изменений.
+- Тесты: unit (создание, повтор, нормализация reason); adversarial (`ticket_id`/`trusted_ticket_id`/`trusted_customer_id` в аргументах, текст тикета с «ticket_id=…», предзаполненный чужой кейс через `CASES`, подстроенная коллизия `case_id`); прямой вызов handler без/с пустым/не-`str` контекстом (результат не зависит от `CASES`); идемпотентность и неизменность `priority`; Executor: флаг доставляет значение, не-флаговым инструментам — не доставляет; инвариант «ни в одном `arguments_model` нет полей `trusted_*`»; сквозной `SupportAgent` с fake-клиентом: кейс создаётся только для `state.ticket.ticket_id`.
+- Риски: массовое обновление существующих тестов `create_support_case` (48 упоминаний в 5 файлах: `test_business_tools`, `test_classification`, `test_classification_fail_closed`, `test_object_authorization`, `test_authorization`; фактическое число падений — NOT VERIFIED до запуска); `required == {"ticket_id","reason","priority"}` (`test_business_tools.py:234`) меняется осознанно; описание инструмента влияет на поведение LLM.
+
+**WP2: Exception Sanitization**
+- Файлы: `agent.py`, `tool_executor.py`; тесты: `test_agent.py`, `test_tool_executor.py`, `test_integration.py`, `test_business_tools.py`, `test_classification.py`, `test_object_authorization.py`, `test_policy_consolidation.py`, новый `tests/test_exception_sanitization.py`.
+- Контракт: §17.2. Инварианты: R1-I1…I8.
+- Acceptance: PII, возбуждённая в handler / классификаторе / клиенте LLM / валидации аргументов / неизвестном инструменте, отсутствует в `AgentRun.model_dump_json()`, `summary()`, `ToolResult` и во входе второго `responses.create`; FAILED-семантика и `raise` сохранены; M03-тесты зелёные без изменения ожиданий.
+- Тесты: по одному на P1–P5 + отдельный на каждый приёмник (trace / summary / LLM-вход); таблица `safe_exception_type` (builtin, подкласс, сторонний, с PII в имени → `Exception`); регрессия `Unexpected classifier error: KeyError`; `AgentStepLimitError` сохраняет текст; ожидаемый `ClassificationError` — без изменений.
+- Существующие тесты, которые придётся осознанно обновить (ожидают `str(exc)` в тексте): `test_integration.py:250`, `test_tool_executor.py:164`, `test_business_tools.py:186`, `test_agent.py:169`; проверки префикса `Invalid arguments for tool` сохраняются.
+- Риски: потеря диагностики и самокоррекции LLM; расширение allowlist типов; скрытые пути вне P1–P5 (закрывается OQ-1).
+
+**WP3: Concurrent Run Guard**
+- Файлы: `agent.py`; тесты: новый `tests/test_concurrent_runs.py`, `test_agent.py` (регрессия).
+- Контракт: §17.3. Инварианты: R2-I1…I8.
+- Acceptance: второй `run()` на занятом экземпляре → `ConcurrentRunError` без мутации; первый завершается корректно; lock свободен после успеха и после исключения; последовательные прогоны работают.
+- Тесты (детерминированно, `threading.Event`): A блокируется в `responses.create`, B отклонён, `last_run`/trace/`state` A не изменены, нет данных `customer_002` в трассе/контексте A; после отпускания A результат корректен, затем прогон C проходит; исключение в A (клиент бросает) → lock освобождён; reentrant-вызов `run()` из fake-клиента → `ConcurrentRunError`, без deadlock (таймаут в тесте); сообщение отказа не содержит ticket/customer/текст; разные экземпляры работают параллельно независимо.
+- Риски: `BaseException`/`KeyboardInterrupt` (покрывается `finally`); публичные `execute_function_call(s)` вне `run()`; хрупкость потоковых тестов (избегать `sleep`, использовать таймауты `join`).
+
+**WP4: Security Regression**
+- Файлы: тесты — новый `tests/test_security_regression_m04.py`; продакшен-код не меняется.
+- Состав: инварианты M01–M03 (K1…K5, K5-R1, M03-D1…D5); матрица cross-tool authorization (5 инструментов × {свой, чужой, несуществующий, нет identity, forged arguments}); негативные тесты trace/summary/LLM-вход на отсутствие чужих данных и PII; контракты Gate и RefundPolicyEngine зафиксированы тестами без изменения; мутационная проверка (откат каждого фикса M04 → падают целевые тесты, фиксируется список); полный `pytest`; `monolith validate`.
+- Acceptance: критерии §17.13; отчёт по каждому инварианту с тестом-свидетелем.
+- Риски: дублирование покрытия; ложная уверенность от mock-данных (Phase 5).
+
+### 17.15 Architecture self-review
+
+**F-7.** (1) Подмена `trusted_ticket_id` через LLM невозможна: поля нет в `arguments_model`, `extra="forbid"`, Executor присваивает значение после `model_dump()`; страхует тест «нет `trusted_*` в схемах». (2) Прямой bypass handler: обязательные keyword-only параметры + проверка первой; вызов минуя Executor возможен только из кода приложения (вне trust boundary, как для остальных инструментов). (3) Customer нужен для единообразия AC2/fail-closed, но проверку «тикет принадлежит клиенту» код дать не может — зафиксировано (§17.4, OQ-2). (4) Идемпотентность: ключ `case_id` не меняется. (5) Отказ не раскрывает чужой кейс: исходы фиксированы и не зависят от `CASES`; отдельный путь «коллизия» возвращает тот же отказ. **Найдено при ревью:** сверка `case.ticket_id` нужна, т. к. 40-битный хэш допускает (крайне маловероятную) коллизию между тикетами.
+
+**R1.** Пять путей перечислены (§17.2), но их набор выведен мной из кода, а не из отчёта Discovery (OQ-1). FAILED-семантика не меняется: санитизируется только запись, исключение пробрасывается. M03 не ломается: ветка `ClassificationError` не затрагивается. Новая утечка через «код диагностики»: `safe_exception_type` возвращает только имена из закрытого списка, не `type(exc).__name__` произвольного подкласса. Остаточный риск: сообщения, которые содержат PII в *имени инструмента* от LLM, не попадают в вывод (используется имя из реестра; в P5 исключение содержит имя, но запись в trace — только тип).
+
+**R2.** Lock берётся первой операцией, до мутаций; освобождается в `finally` при любом исходе; acquire находится вне `try/except → fail`, поэтому отказ второго прогона не помечает первый FAILED; reentrant-вход отклоняется (не deadlock). Скрытое состояние вне защищённого lifecycle: публичные `execute_function_call(s)`, чтение `last_run` другим потоком во время прогона и глобальный `CASES` — зафиксированы как ограничения (§17.11).
+
+### 17.16 Open Questions — CLOSED (решения владельца, 2026-11-13)
+
+Решения OQ-1…OQ-6 утверждены владельцем и **приоритетнее** формулировок «предложено/рекомендуется» в §17.1–§17.15.
+Где §17.2/§17.9 упоминают `safe_exception_type` или произвольные коды — действует OQ-5.
+
+| ID | Решение |
+|---|---|
+| **OQ-1** | Подтверждены пять путей исключений P1–P5 (§17.2): P1 `tool_executor.py:196` handler exception → `ToolResult.error` → LLM/trace; P2 `agent.py:111` ValidationError → LLM/trace; P3 `agent.py:202` `str(exc)` → FAILURE/summary; P4 `agent.py:292` неожиданная ошибка классификатора → trace; P5 исключение неизвестного инструмента → P3 (аргументы инструмента → trace). Все пять входят в **WP2**; в WP1 не исправляются. |
+| **OQ-2** | `customer_id` в `SupportCase` **не добавляется** и в `case_id` не включается: независимого реестра тикетов, подтверждающего `ticket_id → customer_id`, нет. WP1 опирается на trusted customer identity + trusted ticket identity, проверку контекста до обращения к storage и сверку `case.ticket_id` перед возвратом существующего кейса. Алгоритм `case_id` не меняется без доказанной необходимости. |
+| **OQ-3** | (WP2) Ошибки валидации аргументов → только код `invalid_arguments`; без значений аргументов, текстов `ValidationError` и динамических сообщений валидатора. В WP1 общий механизм ValidationError не меняется. |
+| **OQ-4** | Два фиксированных кода: `identity_verification_required`, `ticket_context_required`. При отсутствии обоих контекстов первым возвращается `identity_verification_required`. Проверки — до чтения/записи `CASES`. |
+| **OQ-5** | (WP2) Закрытый набор диагностических категорий: `validation_error`, `tool_execution_error`, `classification_error`, `agent_execution_error`, `unknown_error`. Новая иерархия исключений не вводится; произвольный `type(exc).__name__` наружу не выдаётся (заменяет `safe_exception_type` из §17.2). В WP1 общая санитизация не реализуется. |
+| **OQ-6** | Публичные `execute_function_call(...)` и `execute_function_calls(...)` сохраняются (имена и точки входа не меняются). Все пути исполнения `create_support_case` обязаны обеспечивать trusted ticket binding; вызов без обязательного доверенного контекста завершается безопасным отказом. |

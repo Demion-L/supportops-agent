@@ -22,6 +22,12 @@ ticket owner, and make failures in classification fail closed rather than degrad
 5. Fail-closed behavior on classification error (today: `ClassificationError` → trace + continue
    without classification context, `agent.py::_classify`).
 6. Security regression tests.
+7. *(M04, owner-approved 2026-11-13; see architecture §17)* F-7: trusted ticket binding for
+   `create_support_case` (BLOCKER for closing this Story; ownership stays in SEC-003, not ACT-003).
+8. *(M04)* R1: exception text must not reach trace / `summary()` / LLM context.
+9. *(M04)* R2: fail-closed guard against concurrent `run()` on one `SupportAgent` instance.
+   AC2 is clarified to cover every tool that needs trusted context (architecture §17.4).
+   Acceptance Criteria above are unchanged.
 
 ## Open questions for the owner (to resolve before activation)
 - "Response fail-closed": generalize `refund_response.py`'s refund-only filter, or only item 5?
