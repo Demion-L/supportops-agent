@@ -32,6 +32,16 @@ from supportops_agent.tool_definitions import get_llm_tool_schemas
 MAX_AGENT_STEPS = 10
 MODEL_NAME = "gpt-4.1-mini"
 
+# Fail-closed ответ при ожидаемой ошибке классификации (M03-D3): фиксированный,
+# не генерируется LLM, не зависит от тикета и не содержит диагностики.
+CLASSIFICATION_FAILURE_RESPONSE = (
+    "We're unable to process your request right now. "
+    "Please try again later or contact support."
+)
+
+# Допустимые значения ClassificationError.kind в trace (F-1); прочее -> "unknown".
+_SAFE_CLASSIFICATION_KINDS = frozenset({"invalid_output", "api_error"})
+
 class SupportAgent:
     def __init__(
         self,
@@ -196,7 +206,13 @@ class SupportAgent:
         """Orchestrate the loop; delegates the rest to dedicated helpers."""
 
         self.state = None
-        self.state = self._start(ticket)
+        state = self._start(ticket)
+
+        if state is None:
+            # Fail-closed (M03): прогон уже завершён детерминированным ответом.
+            return CLASSIFICATION_FAILURE_RESPONSE
+
+        self.state = state
 
         for _ in range(MAX_AGENT_STEPS):
             function_calls = self.get_function_calls(self.state.response)
@@ -210,8 +226,20 @@ class SupportAgent:
             f"Agent exceeded maximum number of steps: {MAX_AGENT_STEPS}"
         )
 
-    def _start(self, ticket: SupportTicket) -> AgentState:
-        classification = self._classify(ticket)
+    def _start(self, ticket: SupportTicket) -> AgentState | None:
+        """Classify, then start the LLM loop.
+
+        Возвращает None, если классификация завершилась ожидаемой
+        ClassificationError: прогон уже завершён детерминированным degraded-ответом,
+        LLM, инструменты и оценка возврата не вызывались (fail-closed).
+        """
+
+        try:
+            classification = self._classify(ticket)
+        except ClassificationError:
+            self._finish_classification_failed()
+            return None
+
         self.refund_result = self._evaluate_refund(ticket, classification)
         # Тикет доступен инструментам (доверенная идентичность) уже с первого вызова.
         state = AgentState(ticket=ticket, response=None)
@@ -227,8 +255,9 @@ class SupportAgent:
     def _classify(self, ticket: SupportTicket) -> TicketClassification | None:
         """Classify before the loop.
 
-        ClassificationError is traced and degrades to no context; any other
-        exception is a defect: it is traced and propagated (run -> FAILED).
+        classifier=None -> None (classification disabled, pipeline unchanged).
+        ClassificationError is traced and re-raised: `_start` fails closed.
+        Any other exception is a defect: it is traced and propagated (run -> FAILED).
         """
 
         if self.classifier is None:
@@ -241,12 +270,20 @@ class SupportAgent:
         try:
             result: ClassificationResult = self.classifier.classify(ticket)
         except ClassificationError as exc:
-            # Ожидаемая ошибка классификации: контролируемый fallback.
+            # Ожидаемая ошибка классификации. В trace — только тип и kind:
+            # str(exc) может содержать текст обращения (ValidationError).
+            # kind нормализуется allowlist-ом: сторонний TicketClassifier не может
+            # протащить произвольный текст (PII) в trace через exc.kind.
+            safe_kind = (
+                exc.kind
+                if type(exc.kind) is str and exc.kind in _SAFE_CLASSIFICATION_KINDS
+                else "unknown"
+            )
             self._record_classification_error(
-                input_payload, started_at, f"{type(exc).__name__}: {exc}",
+                input_payload, started_at, f"{type(exc).__name__}: {safe_kind}",
                 output={"fallback": True},
             )
-            return None
+            raise
         except Exception as exc:
             # Программный дефект: фиксируем диагностику и НЕ подавляем.
             # run() переведёт AgentRun в FAILED и пробросит исключение.
@@ -393,6 +430,19 @@ class SupportAgent:
         self.run_manager.complete()
 
         return answer
+
+    def _finish_classification_failed(self) -> None:
+        """Детерминированное завершение при ожидаемой ошибке классификации."""
+
+        self.run_manager.record(
+            AgentStepType.FINAL,
+            output={
+                "answer": CLASSIFICATION_FAILURE_RESPONSE,
+                "degraded": True,
+                "classification_failed": True,
+            },
+        )
+        self.run_manager.complete()
 
     def _call_model(self, model_input, *, previous_response_id: str | None = None):
         kwargs = {"model": MODEL_NAME, "input": model_input}

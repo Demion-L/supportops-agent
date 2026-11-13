@@ -138,6 +138,15 @@ class AgentRun(BaseModel):
             "classification_failed": any(
                 s.error is not None for s in classification_steps
             ),
+            # Fail-closed исход (M03-D2): degraded только у COMPLETED прогона с
+            # degraded FINAL-шагом. FAILED (в т.ч. сбой complete() после FINAL)
+            # никогда не degraded; trace при этом не изменяется.
+            "degraded": self.status == AgentRunStatus.COMPLETED
+            and any(
+                s.step_type == AgentStepType.FINAL
+                and (s.output or {}).get("degraded") is True
+                for s in self.steps
+            ),
             "tool_calls": len(tool_steps),
             "failed_tool_calls": sum(1 for s in tool_steps if s.error is not None),
             "total_tokens": total_tokens or None,

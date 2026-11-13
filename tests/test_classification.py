@@ -3,7 +3,7 @@ import pytest
 from pydantic import ValidationError
 
 from supportops_agent import tool_executor
-from supportops_agent.agent import SupportAgent
+from supportops_agent.agent import CLASSIFICATION_FAILURE_RESPONSE, SupportAgent
 from supportops_agent.classification import (
     ClassificationContext,
     ClassificationEntities,
@@ -218,20 +218,25 @@ def test_agent_records_classification_step_first_and_enriches_context():
     assert len(client.responses.create_calls) == 1  # без скрытых доп. LLM-вызовов
 
 
-def test_agent_classification_failure_is_traced_and_run_continues():
+def test_agent_classification_failure_is_traced_and_run_fails_closed():
+    # M03 (K1): ожидаемая ошибка классификации больше не продолжает прогон.
     client = FakeClient()
     agent = SupportAgent(client, classifier=StubClassifier(exc=ClassificationError(
         "api_error", "down")))
 
-    assert agent.run(ticket("hello")) == "done"
+    assert agent.run(ticket("hello")) == CLASSIFICATION_FAILURE_RESPONSE
 
     first = agent.last_run.steps[0]
     assert first.step_type == AgentStepType.CLASSIFICATION
     assert first.error and "api_error" in first.error
     assert first.output == {"fallback": True}
-    assert client.responses.create_calls[0]["input"] == "hello"  # без обогащения
-    assert agent.last_run.summary()["classification_failed"] is True
-    assert [s.step_number for s in agent.last_run.steps] == [1, 2, 3]
+    assert client.responses.create_calls == []  # LLM-цикл не запускался
+    summary = agent.last_run.summary()
+    assert summary["classification_failed"] is True and summary["degraded"] is True
+    assert [s.step_type for s in agent.last_run.steps] == [
+        AgentStepType.CLASSIFICATION, AgentStepType.FINAL
+    ]
+    assert [s.step_number for s in agent.last_run.steps] == [1, 2]
 
 
 def test_agent_without_classifier_is_unchanged():
@@ -280,11 +285,13 @@ def test_unexpected_classifier_error_fails_run_with_diagnostics():
 
 
 @pytest.mark.parametrize("kind", ["api_error", "invalid_output"])
-def test_expected_classification_errors_keep_controlled_fallback(kind):
+def test_expected_classification_errors_fail_closed_with_controlled_fallback(kind):
+    client = FakeClient()
     agent = SupportAgent(
-        FakeClient(), classifier=StubClassifier(exc=ClassificationError(kind, "x"))
+        client, classifier=StubClassifier(exc=ClassificationError(kind, "x"))
     )
-    assert agent.run(ticket("hi")) == "done"
+    assert agent.run(ticket("hi")) == CLASSIFICATION_FAILURE_RESPONSE
+    assert client.responses.create_calls == []
     assert agent.last_run.status == AgentRunStatus.COMPLETED
     assert agent.last_run.steps[0].output == {"fallback": True}
 
@@ -324,7 +331,10 @@ def make_agent(call, classifier, context=None):
 
 FAILING = lambda: StubClassifier(exc=ClassificationError("api_error", "down"))  # noqa: E731
 UNKNOWN = lambda: StubClassifier(TicketClassification.fallback())  # noqa: E731
-CLASSIFIERS = {"none": lambda: None, "failing": FAILING, "unknown": UNKNOWN}
+# Классификаторы, при которых прогон продолжается. FAILING сюда не входит:
+# ожидаемая ошибка классификации завершает прогон до LLM-цикла (M03,
+# см. tests/test_classification_fail_closed.py).
+CLASSIFIERS = {"none": lambda: None, "unknown": UNKNOWN}
 
 
 @pytest.mark.parametrize("name", CLASSIFIERS)

@@ -282,11 +282,18 @@ def test_orchestrator_crash_does_not_break_run_nor_allow():
     assert step.output["decision"] is None and "SECRET-X" not in json.dumps(step.model_dump(mode="json"))
 
 
-def test_classification_fallback_does_not_evaluate_and_run_continues():
-    agent, _ = run_agent(ticket("order_008"),
-                         StubClassifier(exc=ClassificationError("api_error", "x")), make())
+def test_classification_failure_does_not_evaluate_and_fails_closed():
+    class MustNotEvaluate:
+        def evaluate(self, *a): raise AssertionError("refund evaluation called")
+
+    agent, client = run_agent(ticket("order_008"),
+                              StubClassifier(exc=ClassificationError("api_error", "x")),
+                              MustNotEvaluate())
     assert policy_steps(agent) == []
+    assert agent.refund_result is None
+    assert client.calls == []  # LLM не вызывался
     assert agent.last_run.status == AgentRunStatus.COMPLETED
+    assert agent.last_run.summary()["degraded"] is True
 
 
 @pytest.mark.parametrize("c", [cls([I.ORDER_STATUS]), cls([I.COMPLAINT]),
