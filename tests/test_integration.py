@@ -247,7 +247,7 @@ def test_tool_outage_is_surfaced_to_customer_without_crashing_the_run(monkeypatc
     assert agent.last_run.status == AgentRunStatus.COMPLETED
 
     tool_step = agent.last_run.steps[1]
-    assert tool_step.error == "Tool 'lookup_order' failed: database connection failed"
+    assert tool_step.error == "Tool 'lookup_order' failed [tool_execution_error]"
 
 
 def test_agent_gives_up_and_fails_the_run_when_model_loops_forever():

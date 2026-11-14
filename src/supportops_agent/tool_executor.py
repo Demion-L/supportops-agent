@@ -27,9 +27,33 @@ from supportops_agent.authorization import (
 )
 from supportops_agent.tool_definitions import TOOL_REGISTRY, ToolDefinition
 
-__all__ = ["TOOL_REGISTRY", "ToolCall", "ToolResult", "execute_tool_call"]
+__all__ = [
+    "INVALID_ARGUMENTS_CODE",
+    "SAFE_ERROR_CODES",
+    "TOOL_REGISTRY",
+    "ToolCall",
+    "ToolResult",
+    "execute_tool_call",
+]
 
 logger = logging.getLogger(__name__)
+
+# Закрытый набор диагностических категорий (SEC-003 §17.16 OQ-5). Только эти
+# коды попадают в trace / summary() / ToolResult.error / контекст LLM вместо
+# текста исключения: str(exc) может содержать PII, аргументы, секреты.
+SAFE_ERROR_CODES = frozenset(
+    {
+        "validation_error",
+        "tool_execution_error",
+        "classification_error",
+        "agent_execution_error",
+        "unknown_error",
+    }
+)
+
+# Специальный код ошибок валидации аргументов инструмента (OQ-3); не входит в
+# SAFE_ERROR_CODES и совпадает с ToolResult.error_type.
+INVALID_ARGUMENTS_CODE = "invalid_arguments"
 
 
 class ToolCall(BaseModel):
@@ -195,11 +219,13 @@ def execute_tool_call(
 
         # Guarantees JSON-serializable output (fails on e.g. raw dates/sets).
         output = None if result is None else json.loads(json.dumps(result))
-    except Exception as exc:
+    except Exception:
+        # Текст исключения handler'а (PII, значения аргументов) наружу не идёт:
+        # call.name — ключ реестра (ToolCall валидирует имя), код — константа.
         return ToolResult(
             call_id=call.call_id,
             name=call.name,
-            error=f"Tool '{call.name}' failed: {exc}",
+            error=f"Tool '{call.name}' failed [tool_execution_error]",
             error_type="execution_failed",
         )
 

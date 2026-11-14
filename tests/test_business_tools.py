@@ -192,7 +192,8 @@ def test_handler_crash_becomes_execution_failure(monkeypatch, name, arguments):
     monkeypatch.setattr(TOOL_REGISTRY[name], "handler", boom)
     result = run(name, **arguments)
     assert result.output is None
-    assert result.error == f"Tool '{name}' failed: storage down"
+    assert result.error == f"Tool '{name}' failed [tool_execution_error]"
+    assert "storage down" not in result.model_dump_json()
     assert result.error_type == "execution_failed"
 
 

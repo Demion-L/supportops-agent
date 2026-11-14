@@ -25,7 +25,13 @@ from .refund_evaluation import (
 )
 from .refund_response import build_policy_context, compose_final_answer
 from .run_manager import AgentRunManager
-from .tool_executor import TOOL_REGISTRY, ToolCall, ToolResult, execute_tool_call
+from .tool_executor import (
+    INVALID_ARGUMENTS_CODE,
+    TOOL_REGISTRY,
+    ToolCall,
+    ToolResult,
+    execute_tool_call,
+)
 from supportops_agent.tool_definitions import get_llm_tool_schemas
 
 
@@ -41,6 +47,28 @@ CLASSIFICATION_FAILURE_RESPONSE = (
 
 # Допустимые значения ClassificationError.kind в trace (F-1); прочее -> "unknown".
 _SAFE_CLASSIFICATION_KINDS = frozenset({"invalid_output", "api_error"})
+
+
+
+def _failure_code(exc: BaseException) -> str:
+    """Детерминированная безопасная категория сбоя прогона (R1, P3).
+
+    Закрытая таблица по isinstance; текст и имя класса исключения наружу не
+    идут. validation_error — только pydantic ValidationError (в т.ч. неизвестный
+    инструмент из ToolCall) и JSONDecodeError; внутренний ValueError этим кодом
+    не маркируется. Прочие Exception — agent_execution_error; не-Exception —
+    unknown_error. Код только диагностический: на статус, re-raise, авторизацию
+    и ответ клиенту не влияет.
+    """
+
+    if isinstance(exc, ClassificationError):
+        return "classification_error"
+    if isinstance(exc, (ValidationError, json.JSONDecodeError)):
+        return "validation_error"
+    if isinstance(exc, Exception):
+        return "agent_execution_error"
+    return "unknown_error"
+
 
 class SupportAgent:
     def __init__(
@@ -104,15 +132,20 @@ class SupportAgent:
                 name=item.name,
                 arguments=json.loads(item.arguments),
             )
-        except (json.JSONDecodeError, ValidationError) as exc:
+        except (json.JSONDecodeError, ValidationError):
             if item.name not in TOOL_REGISTRY:
                 raise
 
+            # Текст ValidationError содержит значения аргументов от LLM: наружу
+            # (LLM, trace) идёт только фиксированный код. item.name — ключ реестра.
             return ToolResult(
                 call_id=item.call_id,
                 name=item.name,
-                error=f"Invalid arguments for tool '{item.name}': {exc}",
-                error_type="invalid_arguments",
+                error=(
+                    f"Invalid arguments for tool '{item.name}' "
+                    f"[{INVALID_ARGUMENTS_CODE}]"
+                ),
+                error_type=INVALID_ARGUMENTS_CODE,
             )
 
         # Идентичность берётся из доверенного тикета активного прогона, не из
@@ -207,7 +240,9 @@ class SupportAgent:
         try:
             return self._run_agent_loop(ticket)
         except Exception as exc:
-            self.run_manager.fail(str(exc))
+            # str(exc) не пишем (PII/аргументы): trace и summary получают только
+            # безопасную категорию. Исключение пробрасывается как есть.
+            self.run_manager.fail(_failure_code(exc))
             raise
         finally:
             self._run_active = False
@@ -290,16 +325,17 @@ class SupportAgent:
                 else "unknown"
             )
             self._record_classification_error(
-                input_payload, started_at, f"{type(exc).__name__}: {safe_kind}",
+                input_payload, started_at, f"ClassificationError: {safe_kind}",
                 output={"fallback": True},
             )
             raise
-        except Exception as exc:
+        except Exception:
             # Программный дефект: фиксируем диагностику и НЕ подавляем.
             # run() переведёт AgentRun в FAILED и пробросит исключение.
+            # Ни текст, ни имя класса исключения в trace не пишутся.
             self._record_classification_error(
                 input_payload, started_at,
-                f"Unexpected classifier error: {type(exc).__name__}: {exc}",
+                "Unexpected classifier error [classification_error]",
                 output={"fallback": False, "unexpected_error": True},
             )
             raise

@@ -160,6 +160,5 @@ def test_tool_execution_error_is_returned_as_result(monkeypatch):
     assert result.call_id == "test_failing_order"
     assert result.name == "lookup_order"
     assert result.output is None
-    assert result.error == (
-        "Tool 'lookup_order' failed: database connection failed"
-    )
+    assert result.error == "Tool 'lookup_order' failed [tool_execution_error]"
+    assert "database connection failed" not in result.model_dump_json()

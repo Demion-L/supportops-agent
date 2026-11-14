@@ -276,10 +276,11 @@ def test_unexpected_classifier_error_fails_run_with_diagnostics():
     ]
     assert [s.step_number for s in run.steps] == [1, 2]
     cls_step = run.steps[0]
-    assert "Unexpected classifier error: KeyError" in cls_step.error
+    assert cls_step.error == "Unexpected classifier error [classification_error]"
+    assert "KeyError" not in cls_step.error and "bug" not in cls_step.error
     assert cls_step.output == {"fallback": False, "unexpected_error": True}
     assert "secret text" not in str(cls_step.input)
-    assert run.steps[1].error  # причина зафиксирована и в FAILURE-шаге
+    assert run.steps[1].error == "agent_execution_error"  # безопасная категория в FAILURE
     assert client.responses.create_calls == []  # основной LLM-вызов не выполнялся
     assert run.summary()["classification_failed"] is True
 

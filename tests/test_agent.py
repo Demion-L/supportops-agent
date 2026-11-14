@@ -166,10 +166,11 @@ def test_agent_returns_tool_error_to_model(monkeypatch):
             "call_id": "call_123",
             "output": (
                 "Tool execution error: "
-                "Tool 'lookup_order' failed: database connection failed"
+                "Tool 'lookup_order' failed [tool_execution_error]"
             ),
         }
     ]
+    assert "database connection failed" not in str(second_call["input"])
 
 
 def test_build_tool_output_for_success():
@@ -350,9 +351,9 @@ def test_agent_marks_run_as_failed_when_step_limit_is_exceeded(monkeypatch):
 
     assert agent.last_run.steps[-1].step_type == AgentStepType.FAILURE
     assert (
-        agent.last_run.steps[-1].error
-        == "Agent exceeded maximum number of steps: 10"
+        agent.last_run.steps[-1].error == "agent_execution_error"
     )
+    assert "maximum number of steps" not in agent.last_run.model_dump_json()
 
 
 class UnknownToolResponses(FakeResponses):
@@ -428,7 +429,8 @@ def test_agent_records_explicit_failure_step_for_client_api_error():
 
     assert len(agent.last_run.steps) == 1
     assert agent.last_run.steps[0].step_type == AgentStepType.FAILURE
-    assert agent.last_run.steps[0].error == "OpenAI API unavailable"
+    assert agent.last_run.steps[0].error == "agent_execution_error"
+    assert "OpenAI API unavailable" not in agent.last_run.model_dump_json()
 
 
 class ParallelToolCallResponses(FakeResponses):
