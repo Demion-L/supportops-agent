@@ -358,7 +358,7 @@ def test_unregistered_tool_still_rejected_regardless_of_classification(name):
 @pytest.mark.parametrize("name", CLASSIFIERS)
 def test_invalid_tool_arguments_still_rejected_regardless_of_classification(name):
     agent, _ = make_agent(
-        FnCall("create_support_case", '{"ticket_id": "t1", "reason": "r"}'),
+        FnCall("create_support_case", '{"reason": "r"}'),
         CLASSIFIERS[name](),
     )
     agent.run(ticket())
@@ -372,7 +372,7 @@ def test_authorization_does_not_depend_on_classification():
     from supportops_agent import mock_data
     from supportops_agent.authorization import support_agent_context
 
-    args = '{"ticket_id": "t1", "reason": "r", "priority": "high"}'
+    args = '{"reason": "r", "priority": "high"}'
     for name in CLASSIFIERS:
         mock_data.CASES.clear()
         agent, _ = make_agent(

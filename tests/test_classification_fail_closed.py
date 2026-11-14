@@ -35,7 +35,7 @@ EXPECTED_TEXT = (
 class FnCall:
     type = "function_call"
     name = "create_support_case"
-    arguments = '{"ticket_id": "t1", "reason": "r", "priority": "high"}'
+    arguments = '{"reason": "r", "priority": "high"}'
     call_id = "call_1"
 
 

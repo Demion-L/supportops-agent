@@ -62,8 +62,8 @@ def dump(result) -> str:
 
 def test_protected_tools_require_trusted_identity():
     flagged = {n for n, d in TOOL_REGISTRY.items() if d.requires_trusted_identity}
-    assert flagged == {*PROTECTED, "check_refund_eligibility"}
-    assert not TOOL_REGISTRY["create_support_case"].requires_trusted_identity
+    # M04/F-7 (AC2 clarification): create_support_case also needs trusted identity.
+    assert flagged == {*PROTECTED, "check_refund_eligibility", "create_support_case"}
 
 
 # ---------- 1/4/6. Свои объекты ----------

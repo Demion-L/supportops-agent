@@ -152,22 +152,46 @@ def _case_id(ticket_id: str, reason: str) -> str:
     return "case_" + hashlib.sha256(key.encode()).hexdigest()[:10]
 
 
+def _ticket_context_required() -> dict[str, object]:
+    """Фиксированный отказ без доверенного тикета (не зависит от CASES и аргументов)."""
+
+    return {"outcome": "ticket_context_required"}
+
+
 def create_support_case(
-    ticket_id: str, reason: str, priority: CasePriority
+    reason: str,
+    priority: CasePriority,
+    *,
+    trusted_ticket_id: str | None = None,
+    trusted_customer_id: str | None = None,
 ) -> dict[str, object]:
     """Create a support case, or return the existing one for a retried request.
 
-    A request is the same when ticket_id and the normalized reason match;
-    priority is not part of the identity, and a retry never changes it.
+    ``trusted_ticket_id`` / ``trusted_customer_id`` come from the application's
+    trusted ticket, never from model arguments. Both are checked before CASES
+    is touched (customer first). A request is the same when the trusted ticket
+    and the normalized reason match; priority is not part of the identity, and
+    a retry never changes it.
     """
 
-    ticket_id = ticket_id.strip()
+    if _normalize_identity(trusted_customer_id) is None:
+        return _identity_required()
+
+    ticket_id = _normalize_identity(trusted_ticket_id)
+
+    if ticket_id is None:
+        return _ticket_context_required()
+
     reason = reason.strip()
     case_id = _case_id(ticket_id, reason)
 
     existing = mock_data.CASES.get(case_id)
 
     if existing is not None:
+        if existing.ticket_id != ticket_id:
+            # Коллизия усечённого хэша: чужой кейс не раскрывается и не меняется.
+            return _ticket_context_required()
+
         return {"outcome": "already_exists", "case": existing.model_dump(mode="json")}
 
     case = SupportCase(

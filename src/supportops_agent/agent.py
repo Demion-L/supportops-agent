@@ -75,6 +75,9 @@ class SupportAgent:
         self.run_manager: AgentRunManager | None = None
         self.refund_result: RefundEvaluationResult | None = None
         self.state: AgentState | None = None
+        # Trusted context действителен только внутри run(). `state` сохраняется
+        # для диагностики, но после завершения не даёт полномочий (SR-1).
+        self._run_active = False
 
     @property
     def last_run(self) -> AgentRun | None:
@@ -112,12 +115,16 @@ class SupportAgent:
                 error_type="invalid_arguments",
             )
 
-        # Идентичность берётся из доверенного тикета, не из аргументов модели.
+        # Идентичность берётся из доверенного тикета активного прогона, не из
+        # аргументов модели. Вне run() (до первого, после COMPLETED/FAILED/
+        # degraded) устаревший state полномочий не даёт -> fail-closed.
+        state = self.state if self._run_active else None
         return execute_tool_call(
             tool_call,
             self.context,
             self.policy,
-            trusted_customer_id=self.state.ticket.customer_id if self.state else None,
+            trusted_customer_id=state.ticket.customer_id if state else None,
+            trusted_ticket_id=state.ticket.ticket_id if state else None,
         )
 
     def execute_function_calls(self, function_calls: list) -> list[dict[str, str]]:
@@ -195,12 +202,15 @@ class SupportAgent:
         # any error aborting the loop gets recorded as a failure step below
         self.run_manager = AgentRunManager(ticket.ticket_id)
         self.refund_result = None
+        self._run_active = True
 
         try:
             return self._run_agent_loop(ticket)
         except Exception as exc:
             self.run_manager.fail(str(exc))
             raise
+        finally:
+            self._run_active = False
 
     def _run_agent_loop(self, ticket: SupportTicket) -> str:
         """Orchestrate the loop; delegates the rest to dedicated helpers."""

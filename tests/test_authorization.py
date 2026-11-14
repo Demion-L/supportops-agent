@@ -26,9 +26,20 @@ from supportops_agent.classification import (
 )
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
 from supportops_agent.run_manager import AgentRunManager
-from supportops_agent.tool_executor import TOOL_REGISTRY, ToolCall, execute_tool_call
+from supportops_agent.tool_executor import TOOL_REGISTRY, ToolCall
+from supportops_agent.tool_executor import execute_tool_call as _execute_tool_call
 
-CASE_ARGS = {"ticket_id": "t1", "reason": "refund help", "priority": "high"}
+# M04 (F-7): ticket_id is no longer a model argument; the trusted ticket/customer
+# come from the application. The wrapper supplies them as the SupportAgent would.
+CASE_ARGS = {"reason": "refund help", "priority": "high"}
+TRUSTED_TICKET_ID = "t1"
+TRUSTED_CUSTOMER_ID = "customer_001"
+
+
+def execute_tool_call(call, context=None, *args, **kwargs):
+    kwargs.setdefault("trusted_customer_id", TRUSTED_CUSTOMER_ID)
+    kwargs.setdefault("trusted_ticket_id", TRUSTED_TICKET_ID)
+    return _execute_tool_call(call, context, *args, **kwargs)
 
 
 # ---- helpers ----------------------------------------------------------------

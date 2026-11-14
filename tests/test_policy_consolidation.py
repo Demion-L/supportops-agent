@@ -464,9 +464,11 @@ def test_default_evaluator_uses_trusted_components():
 
 def test_executor_flag_on_identity_bound_tools():
     flagged = {n for n, d in TOOL_REGISTRY.items() if d.requires_trusted_identity}
-    # SEC-003/M02: к refund-инструменту добавлены три инструмента чтения клиентских данных
+    # SEC-003/M02: к refund-инструменту добавлены три инструмента чтения клиентских данных;
+    # SEC-003/M04 (F-7, AC2): create_support_case требует trusted identity и trusted ticket.
     assert flagged == {
         "check_refund_eligibility", "lookup_order", "lookup_customer", "get_order_tracking",
+        "create_support_case",
     }
 
 

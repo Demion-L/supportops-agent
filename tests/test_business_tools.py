@@ -26,11 +26,20 @@ ALL_TOOLS = {
 }
 
 
-def run(name, trusted_customer_id=None, **arguments):
+def run(name, trusted_customer_id=None, trusted_ticket_id=None, **arguments):
     return execute_tool_call(
         ToolCall(call_id="c1", name=name, arguments=arguments),
         support_agent_context(),
         trusted_customer_id=trusted_customer_id,
+        trusted_ticket_id=trusted_ticket_id,
+    )
+
+
+def run_case(ticket_id="t1", **arguments):
+    """create_support_case with the trusted ticket/customer the agent would supply."""
+
+    return run(
+        "create_support_case", "customer_001", trusted_ticket_id=ticket_id, **arguments
     )
 
 
@@ -119,7 +128,7 @@ def test_refund_check_does_not_modify_orders():
 # --- create_support_case ----------------------------------------------------
 
 def test_create_case_stores_and_returns_structured_result():
-    result = run("create_support_case", ticket_id="t1", reason="Damaged item", priority="high")
+    result = run_case("t1", reason="Damaged item", priority="high")
     assert result.error is None
     assert result.output["outcome"] == "created"
     case = result.output["case"]
@@ -129,28 +138,28 @@ def test_create_case_stores_and_returns_structured_result():
 
 
 def test_duplicate_case_is_not_created_on_retry():
-    first = run("create_support_case", ticket_id="t1", reason="Damaged item", priority="high")
-    retry = run("create_support_case", ticket_id="t1", reason="  damaged   ITEM ", priority="low")
+    first = run_case("t1", reason="Damaged item", priority="high")
+    retry = run_case("t1", reason="  damaged   ITEM ", priority="low")
     assert retry.output["outcome"] == "already_exists"
     assert retry.output["case"] == first.output["case"]  # priority not overwritten
     assert len(mock_data.CASES) == 1
 
 
 def test_different_reason_or_ticket_creates_new_case():
-    run("create_support_case", ticket_id="t1", reason="A", priority="low")
-    run("create_support_case", ticket_id="t1", reason="B", priority="low")
-    run("create_support_case", ticket_id="t2", reason="A", priority="low")
+    run_case("t1", reason="A", priority="low")
+    run_case("t1", reason="B", priority="low")
+    run_case("t2", reason="A", priority="low")
     assert len(mock_data.CASES) == 3
 
 
 @pytest.mark.parametrize(
     "arguments",
     [
-        {"ticket_id": "t1", "reason": "x", "priority": "critical"},
-        {"ticket_id": "t1", "reason": "", "priority": "low"},
-        {"ticket_id": "t1", "priority": "low"},
-        {"ticket_id": "", "reason": "x", "priority": "low"},
-        {"ticket_id": "t1", "reason": "x", "priority": "low", "extra": 1},
+        {"reason": "x", "priority": "critical"},
+        {"reason": "", "priority": "low"},
+        {"priority": "low"},
+        {"reason": "x", "priority": "low", "extra": 1},
+        {"ticket_id": "t1", "reason": "x", "priority": "low"},  # F-7: no model-supplied ticket_id
     ],
 )
 def test_create_case_rejects_invalid_arguments(arguments):
@@ -173,7 +182,7 @@ def test_new_order_tools_reject_invalid_arguments(name):
     [
         ("get_order_tracking", {"order_id": "order_001"}),
         ("check_refund_eligibility", {"order_id": "order_001"}),
-        ("create_support_case", {"ticket_id": "t", "reason": "r", "priority": "low"}),
+        ("create_support_case", {"reason": "r", "priority": "low"}),
     ],
 )
 def test_handler_crash_becomes_execution_failure(monkeypatch, name, arguments):
@@ -198,9 +207,9 @@ def test_results_are_json_serializable():
         ("lookup_order", {"order_id": "order_001"}),
         ("get_order_tracking", {"order_id": "order_001"}),
         ("check_refund_eligibility", {"order_id": "order_001"}),
-        ("create_support_case", {"ticket_id": "t", "reason": "r", "priority": "low"}),
+        ("create_support_case", {"reason": "r", "priority": "low"}),
     ]:
-        json.dumps(run(name, "customer_001", **args).model_dump(mode="json"))
+        json.dumps(run(name, "customer_001", trusted_ticket_id="t", **args).model_dump(mode="json"))
 
 
 def test_successful_result_has_no_error_type():
@@ -231,7 +240,7 @@ def test_llm_schemas_are_generated_from_registry():
 
 def test_create_support_case_schema_exposes_priority_enum():
     params = next(s for s in get_llm_tool_schemas() if s["name"] == "create_support_case")["parameters"]
-    assert set(params["required"]) == {"ticket_id", "reason", "priority"}
+    assert set(params["required"]) == {"reason", "priority"}
     priority = params["properties"]["priority"]
     values = priority.get("enum") or params["$defs"]["CasePriority"]["enum"]
     assert values == ["low", "normal", "high", "urgent"]
@@ -298,7 +307,7 @@ def test_agent_runs_new_tools_and_sends_registry_schemas():
                 [
                     _Call("c1", "check_refund_eligibility", '{"order_id": "order_008"}'),
                     _Call("c2", "create_support_case",
-                          '{"ticket_id": "t9", "reason": "refund", "priority": "normal"}'),
+                          '{"reason": "refund", "priority": "normal"}'),
                 ],
             ),
             _Response("r2", text="done"),
@@ -319,7 +328,7 @@ def test_agent_runs_new_tools_and_sends_registry_schemas():
 def test_agent_reports_invalid_new_tool_arguments_to_model():
     client = _Client(
         [
-            _Response("r1", [_Call("c1", "create_support_case", '{"ticket_id": "t", "priority": "bad"}')]),
+            _Response("r1", [_Call("c1", "create_support_case", '{"priority": "bad"}')]),
             _Response("r2", text="sorry"),
         ]
     )

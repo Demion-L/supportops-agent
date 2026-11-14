@@ -159,6 +159,7 @@ def execute_tool_call(
     policy: ToolAuthorizationPolicy | None = DEFAULT_POLICY,
     *,
     trusted_customer_id: str | None = None,
+    trusted_ticket_id: str | None = None,
 ) -> ToolResult:
     """Authorize, then execute a validated tool call.
 
@@ -168,6 +169,9 @@ def execute_tool_call(
     ``trusted_customer_id`` is the application-verified identity of the ticket
     owner. It is forwarded only to tools flagged ``requires_trusted_identity``
     and is never read from ``call.arguments`` (the models forbid extra fields).
+    ``trusted_ticket_id`` is the ticket of the current run; it is forwarded only
+    to tools flagged ``requires_trusted_ticket``, after ``model_dump()``, so
+    model-supplied values can never override it.
     """
 
     definition = TOOL_REGISTRY.get(call.name)
@@ -181,6 +185,8 @@ def execute_tool_call(
         kwargs = call.arguments.model_dump()
         if definition.requires_trusted_identity:
             kwargs["trusted_customer_id"] = trusted_customer_id
+        if definition.requires_trusted_ticket:
+            kwargs["trusted_ticket_id"] = trusted_ticket_id
 
         result = definition.handler(**kwargs)
 

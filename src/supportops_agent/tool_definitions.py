@@ -46,7 +46,6 @@ class CheckRefundEligibilityArguments(_Arguments):
 class CreateSupportCaseArguments(_Arguments):
     """Validated arguments for the create_support_case tool."""
 
-    ticket_id: str = Field(min_length=1, max_length=100, description="The ID of the support ticket the case belongs to.")
     reason: str = Field(min_length=1, max_length=1000, description="Why the case is being opened.")
     priority: CasePriority = Field(description="Case priority.")
 
@@ -64,6 +63,9 @@ class ToolDefinition:
     # Handler получает `trusted_customer_id` от ToolExecutor (из доверенного
     # контекста приложения). В аргументах LLM такого поля нет и быть не может.
     requires_trusted_identity: bool = False
+    # Handler получает `trusted_ticket_id` (тикет текущего прогона) от ToolExecutor.
+    # В аргументах LLM такого поля нет.
+    requires_trusted_ticket: bool = False
 
     def to_llm_schema(self) -> dict[str, object]:
         """Provider-neutral JSON-schema function spec (OpenAI Responses shape)."""
@@ -122,13 +124,16 @@ _DEFINITIONS = [
     ToolDefinition(
         name="create_support_case",
         description=(
-            "Open an internal support case for a ticket so a human agent can follow up. "
-            "Retrying with the same ticket and reason returns the existing case "
+            "Open an internal support case for the current ticket so a human agent can follow up. "
+            "The ticket and customer are set by the system, not by arguments. "
+            "Retrying with the same reason returns the existing case "
             "instead of creating a duplicate."
         ),
         arguments_model=CreateSupportCaseArguments,
         handler=create_support_case,
         has_side_effects=True,
+        requires_trusted_identity=True,
+        requires_trusted_ticket=True,
     ),
 ]
 
