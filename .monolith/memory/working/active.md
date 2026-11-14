@@ -44,5 +44,17 @@ No finalization recorded yet.
 SupportOps Agent: Python support-ticket agent (tool-calling loop, execution trace,
 classification, tool authorization gate, deterministic refund policy).
 Phases 1–3 history is a retrospective reconstruction (`context/retrospective/`), not finalized stories.
-Active story: SUPPORTOPS-SEC-003 (`context/planned/SUPPORTOPS-SEC-003.md`). Current work is the
-architectural Mission SEC003-M01 (analysis only; no code changes).
+Active story: SUPPORTOPS-SEC-003 (`context/planned/SUPPORTOPS-SEC-003.md`).
+
+Mission state (SUPPORTOPS-SEC-003; source of truth: `monolith mission list` / `.monolith/state.json`):
+
+- SEC003-M01 (MIS-0001), M02 (MIS-0002), M03 (MIS-0003) — completed.
+- SEC003-M04 (MIS-0004), Security Hardening & Final Regression — **in progress**:
+  - WP1 trusted ticket binding — done (`eb6eb53`).
+  - WP2 exception sanitization — done (`f7297d7`).
+  - WP3 concurrent run isolation — done (`5d3b46d`).
+  - WP3-H1 double-failure lifecycle hardening — done (`eb42b97`).
+  - SR-4 / SR-5 — awaiting discovery (not started).
+  - WP4 (final regression) — not started.
+
+Story and Mission remain open; Story is not finalized.
