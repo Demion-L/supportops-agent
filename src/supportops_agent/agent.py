@@ -1,4 +1,5 @@
 import json
+import threading
 from datetime import UTC, datetime
 
 from openai import OpenAI
@@ -17,7 +18,7 @@ from .authorization import (
     ExecutionContext,
     ToolAuthorizationPolicy,
 )
-from .models import AgentRun, AgentStepType, SupportTicket
+from .models import AgentRun, AgentRunStatus, AgentStepType, SupportTicket
 from .refund_evaluation import (
     RefundEvaluationOrchestrator,
     RefundEvaluationResult,
@@ -48,6 +49,14 @@ CLASSIFICATION_FAILURE_RESPONSE = (
 # Допустимые значения ClassificationError.kind в trace (F-1); прочее -> "unknown".
 _SAFE_CLASSIFICATION_KINDS = frozenset({"invalid_output", "api_error"})
 
+
+
+class ConcurrentRunError(RuntimeError):
+    """Второй run() на экземпляре, у которого уже есть активный прогон.
+
+    Сообщение статичное: ни ticket, ни customer, ни текст обращения в него
+    не попадают.
+    """
 
 
 def _failure_code(exc: BaseException) -> str:
@@ -106,6 +115,30 @@ class SupportAgent:
         # Trusted context действителен только внутри run(). `state` сохраняется
         # для диагностики, но после завершения не даёт полномочий (SR-1).
         self._run_active = False
+        # Один экземпляр — один активный run(). Lock (не RLock): повторный вход
+        # из того же потока тоже отклоняется. Захват неблокирующий.
+        self._run_lock = threading.Lock()
+        # Поток, которому принадлежит активный прогон. Trusted context и запись
+        # в trace доступны только ему; вне активного прогона None. Это ЕДИНСТВЕННЫЙ
+        # источник решения о принадлежности (`_run_active` — только диагностика):
+        # run() выставляет его из потока-владельца и сбрасывает из него же, поэтому
+        # `owner == текущий поток` означает, что поток сейчас внутри run() и run не
+        # может завершиться, пока этот же поток исполняет вызов.
+        self._run_owner: int | None = None
+
+    def _trusted_state(self) -> AgentState | None:
+        """Trusted context активного прогона — только его потоку-владельцу.
+
+        Владелец читается ОДИН раз (атомарный снимок), решение принимается до
+        обращения к `self.state`. Вне прогона (owner is None) и для чужого потока
+        возвращается None -> fail-closed.
+        """
+
+        owner = self._run_owner
+        if owner is None or owner != threading.get_ident():
+            return None
+
+        return self.state
 
     @property
     def last_run(self) -> AgentRun | None:
@@ -151,7 +184,9 @@ class SupportAgent:
         # Идентичность берётся из доверенного тикета активного прогона, не из
         # аргументов модели. Вне run() (до первого, после COMPLETED/FAILED/
         # degraded) устаревший state полномочий не даёт -> fail-closed.
-        state = self.state if self._run_active else None
+        # Во время активного прогона полномочия получает только его поток-владелец:
+        # вызов из другого потока fail-closed.
+        state = self._trusted_state()
         return execute_tool_call(
             tool_call,
             self.context,
@@ -175,31 +210,58 @@ class SupportAgent:
             except json.JSONDecodeError:
                 arguments = item.arguments
 
-            self.run_manager.record(
-                AgentStepType.TOOL_EXECUTION,
-                input={
-                    "call_id": item.call_id,
-                    "tool": item.name,
-                    "arguments": arguments,
-                    **(
-                        {
-                            "reason_code": tool_result.reason_code,
-                            "diagnostic_type": tool_result.diagnostic_type,
-                        }
-                        if tool_result.diagnostic_type
-                        else {}
-                    ),
-                },
-                output=tool_result.output,
-                error=tool_result.error,
-                started_at=started_at,
-                finished_at=finished_at,
-                duration_ms=duration_ms,
-            )
+            # Один снимок менеджера: проверка и запись — над одним объектом.
+            manager = self._writable_manager()
+            if manager is not None:
+                manager.record(
+                    AgentStepType.TOOL_EXECUTION,
+                    input={
+                        "call_id": item.call_id,
+                        "tool": item.name,
+                        "arguments": arguments,
+                        **(
+                            {
+                                "reason_code": tool_result.reason_code,
+                                "diagnostic_type": tool_result.diagnostic_type,
+                            }
+                            if tool_result.diagnostic_type
+                            else {}
+                        ),
+                    },
+                    output=tool_result.output,
+                    error=tool_result.error,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    duration_ms=duration_ms,
+                )
 
             tool_outputs.append(self.build_tool_output(tool_result))
 
         return tool_outputs
+
+    def _writable_manager(self) -> AgentRunManager | None:
+        """Менеджер trace, в который сейчас можно писать, иначе None.
+
+        Менеджер читается ОДИН раз и ДО владельца: run() выставляет владельца
+        раньше, чем публикует новый менеджер, поэтому чужой менеджер активного
+        прогона не может быть получен вместе с owner=None. Запись разрешена,
+        пока trace RUNNING и вызов не чужой. Завершённый (COMPLETED/FAILED, в т.ч.
+        аварийно прерванный) trace неизменяем. Ручной AgentRunManager (RUNNING,
+        без активного run()) по-прежнему пишется — прежний контракт.
+        """
+
+        manager = self.run_manager
+        if manager is None:
+            return None
+
+        owner = self._run_owner
+        if owner is not None and owner != threading.get_ident():
+            return None
+
+        if manager.run.status != AgentRunStatus.RUNNING:
+            return None
+
+        return manager
 
     @staticmethod
     def extract_token_usage(response) -> dict[str, int] | None:
@@ -232,20 +294,55 @@ class SupportAgent:
         }
 
     def run(self, ticket: SupportTicket) -> str:
-        # any error aborting the loop gets recorded as a failure step below
-        self.run_manager = AgentRunManager(ticket.ticket_id)
-        self.refund_result = None
-        self._run_active = True
+        """Один экземпляр — один активный run() (M04-D3).
 
+        Второй вызов (из другого потока или повторный вход) немедленно получает
+        ConcurrentRunError и ничего не меняет. Публичные execute_function_call(s)
+        — внутренние шаги цикла: trusted context и запись в trace доступны
+        только потоку, владеющему активным прогоном.
+        """
+
+        # Захват — первой операцией, до любой мутации и вне try/finally ниже:
+        # отклонённый вызов не помечает FAILED чужой прогон и не освобождает
+        # чужой lock.
+        if not self._run_lock.acquire(blocking=False):
+            raise ConcurrentRunError("Agent run already in progress")
+
+        manager: AgentRunManager | None = None
         try:
-            return self._run_agent_loop(ticket)
-        except Exception as exc:
-            # str(exc) не пишем (PII/аргументы): trace и summary получают только
-            # безопасную категорию. Исключение пробрасывается как есть.
-            self.run_manager.fail(_failure_code(exc))
-            raise
+            # Порядок важен: сначала сброс чужого state и владелец, потом
+            # публикация нового менеджера (см. _writable_manager).
+            self.state = None
+            self.refund_result = None
+            self._run_owner = threading.get_ident()
+            manager = self.run_manager = AgentRunManager(ticket.ticket_id)
+            self._run_active = True
+
+            try:
+                return self._run_agent_loop(ticket)
+            except BaseException as exc:
+                # Не подавляем: фиксируем безопасный код и пробрасываем как есть,
+                # в т.ч. KeyboardInterrupt/SystemExit — trace не остаётся RUNNING.
+                # str(exc) не пишем (PII/аргументы).
+                manager.fail(_failure_code(exc))
+                raise
         finally:
-            self._run_active = False
+            try:
+                # Если даже fail() прервали — trace всё равно запечатывается.
+                if manager is not None:
+                    self._seal_trace(manager)
+            finally:
+                self._run_active = False
+                self._run_owner = None
+                self._run_lock.release()
+
+    @staticmethod
+    def _seal_trace(manager: AgentRunManager) -> None:
+        """Запретить выход из run() с trace в статусе RUNNING (fail-safe)."""
+
+        if manager.run.status == AgentRunStatus.RUNNING:
+            manager.run.status = AgentRunStatus.FAILED
+            manager.run.finished_at = datetime.now(UTC)
 
     def _run_agent_loop(self, ticket: SupportTicket) -> str:
         """Orchestrate the loop; delegates the rest to dedicated helpers."""
