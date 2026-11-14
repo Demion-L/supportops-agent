@@ -709,8 +709,8 @@ def test_b3_t4_aborted_trace_rejects_late_events(exc):
     assert mock_data.CASES == {}
 
 
-# B3: even if recording the failure is itself interrupted, the trace is sealed
-# and the lock is released; the interrupt still propagates.
+# B3 / WP3-H1 F-1: even if recording the failure is itself interrupted, the
+# trace is sealed and the lock is released; the ORIGINAL exception propagates.
 def test_b3_fail_itself_interrupted_still_seals_and_releases(monkeypatch):
     from supportops_agent.run_manager import AgentRunManager
 
@@ -718,11 +718,13 @@ def test_b3_fail_itself_interrupted_still_seals_and_releases(monkeypatch):
         raise KeyboardInterrupt("second interrupt")
 
     monkeypatch.setattr(AgentRunManager, "fail", broken_fail)
-    agent = _agent(_Client(raise_exc=RuntimeError("x")))
+    original = RuntimeError("x")
+    agent = _agent(_Client(raise_exc=original))
 
-    with pytest.raises(KeyboardInterrupt):
+    with pytest.raises(RuntimeError) as info:
         agent.run(_ticket())
 
+    assert info.value is original
     assert agent.last_run.status == AgentRunStatus.FAILED
     assert _is_idle(agent) and agent._run_owner is None
 
@@ -761,3 +763,258 @@ def test_b2_owner_is_published_before_run_manager():
     agent.run(_ticket())
 
     assert published == [threading.get_ident()]
+
+
+# ---------------------------------------------------------------------------
+# WP3-H1: double-failure lifecycle (F-1 original exception, F-2 trace sealing)
+# ---------------------------------------------------------------------------
+
+class _Secondary(Exception):
+    """Synthetic diagnostic failure; its text must never reach the trace."""
+
+
+SECRET = "customer_002 SECRET-secondary"
+
+
+def _break_fail(monkeypatch, exc_factory=lambda: _Secondary(SECRET)):
+    from supportops_agent.run_manager import AgentRunManager
+
+    def broken_fail(self, error=None):
+        raise exc_factory()
+
+    monkeypatch.setattr(AgentRunManager, "fail", broken_fail)
+
+
+def _break_seal(monkeypatch, exc_factory=lambda: _Secondary(SECRET)):
+    def broken_seal(manager):
+        raise exc_factory()
+
+    monkeypatch.setattr(SupportAgent, "_seal_trace", staticmethod(broken_seal))
+
+
+_ORIGINALS = [
+    RuntimeError("orig"),
+    KeyboardInterrupt("orig"),
+    SystemExit(7),
+    GeneratorExit("orig"),
+]
+
+
+# H1-T1 / F1-I1, I2: original survives a failing manager.fail().
+@pytest.mark.parametrize("original", _ORIGINALS)
+def test_h1_t1_original_survives_failing_fail(monkeypatch, original):
+    _break_fail(monkeypatch)
+    agent = _agent(_Client(raise_exc=original))
+
+    with pytest.raises(type(original)) as info:
+        agent.run(_ticket())
+
+    assert info.value is original
+    assert agent.last_run.status == AgentRunStatus.FAILED  # sealed by finally
+    assert _is_idle(agent) and agent._run_owner is None
+
+
+# H1-T2: original survives a failing _seal_trace() (fail() worked).
+@pytest.mark.parametrize("original", _ORIGINALS)
+def test_h1_t2_original_survives_failing_seal(monkeypatch, original):
+    _break_seal(monkeypatch)
+    agent = _agent(_Client(raise_exc=original))
+
+    with pytest.raises(type(original)) as info:
+        agent.run(_ticket())
+
+    assert info.value is original
+    assert agent.last_run.status == AgentRunStatus.FAILED  # fail() did it
+    assert _is_idle(agent) and agent._run_owner is None
+
+
+# H1-T3 / T4 / T5 / T6: both mechanisms fail, any original (Exception,
+# KeyboardInterrupt, SystemExit, GeneratorExit), secondary of any kind.
+@pytest.mark.parametrize("original", _ORIGINALS)
+@pytest.mark.parametrize(
+    "secondary", [lambda: _Secondary(SECRET), lambda: KeyboardInterrupt(SECRET)]
+)
+def test_h1_t3_t6_double_failure_preserves_original_and_releases(
+    monkeypatch, original, secondary
+):
+    _break_fail(monkeypatch, secondary)
+    _break_seal(monkeypatch, secondary)
+    agent = _agent(_Client(raise_exc=original))
+
+    with pytest.raises(type(original)) as info:
+        agent.run(_ticket())
+
+    assert info.value is original  # not replaced by the secondary
+    assert not agent._run_lock.locked()  # H1-T6 / F1-I3
+    assert agent._run_owner is None  # F1-I4
+    assert agent._run_active is False  # F1-I5
+    assert SECRET not in agent.last_run.model_dump_json()  # F1-I6
+    assert SECRET not in json.dumps(agent.last_run.summary(), default=str)
+
+
+# H1-T7 / T8 / F-2: after a double failure the trace stays RUNNING by status,
+# but is closed for writes and trusted context is unavailable.
+def test_h1_t7_t8_double_failure_trace_is_closed_and_context_unavailable(
+    monkeypatch,
+):
+    _break_fail(monkeypatch)
+    _break_seal(monkeypatch)
+    agent = _agent(_Client(raise_exc=RuntimeError("orig")))
+
+    with pytest.raises(RuntimeError):
+        agent.run(_ticket())
+
+    # Premise of the scenario: status really could not be changed.
+    assert agent.last_run.status == AgentRunStatus.RUNNING
+    snapshot = agent.last_run.model_dump_json()
+
+    outputs = agent.execute_function_calls([_Call("late", "call_late")])
+
+    assert len(outputs) == 1
+    assert agent.execute_function_call(_Call("late")).output == IDENTITY  # T7
+    assert agent._trusted_state() is None
+    assert agent._writable_manager() is None  # T8
+    assert agent.last_run.model_dump_json() == snapshot
+    assert mock_data.CASES == {}
+
+
+# H1-T7b: late writes from a foreign thread are also refused after double failure.
+def test_h1_t7b_foreign_thread_cannot_write_after_double_failure(monkeypatch):
+    _break_fail(monkeypatch)
+    _break_seal(monkeypatch)
+    agent = _agent(_Client(raise_exc=RuntimeError("orig")))
+    with pytest.raises(RuntimeError):
+        agent.run(_ticket())
+    snapshot = agent.last_run.model_dump_json()
+
+    seen = {}
+
+    def target():
+        seen["outputs"] = agent.execute_function_calls([_Call("x", "c")])
+        seen["owner_view"] = agent._trusted_state()
+
+    thread = threading.Thread(target=target, daemon=True)
+    thread.start()
+    thread.join(TIMEOUT)
+
+    assert not thread.is_alive()
+    assert seen["owner_view"] is None
+    assert agent.last_run.model_dump_json() == snapshot
+    assert mock_data.CASES == {}
+
+
+# H1-T9: a subsequent run() works and does not inherit the closed marker.
+def test_h1_t9_next_run_works_after_double_failure(monkeypatch):
+    with monkeypatch.context() as patch:
+        _break_fail(patch)
+        _break_seal(patch)
+        agent = _agent(_Client(raise_exc=RuntimeError("orig")))
+        with pytest.raises(RuntimeError):
+            agent.run(_ticket("ticket_A", "customer_001"))
+    broken = agent.last_run
+
+    agent.client = _Client(first_call=_Call("second"))
+    assert agent.run(_ticket("ticket_B", "customer_002")) == "Safe answer."
+
+    assert agent.last_run is not broken
+    assert agent.last_run.status == AgentRunStatus.COMPLETED
+    assert [c.reason for c in mock_data.CASES.values()] == ["second"]
+    # the new trace received its events; the broken one stayed untouched
+    assert any(
+        s.step_type == AgentStepType.TOOL_EXECUTION for s in agent.last_run.steps
+    )
+    assert not any(
+        s.step_type == AgentStepType.TOOL_EXECUTION for s in broken.steps
+    )
+
+
+# H1-T10: M03 degraded semantics is unchanged by the hardening.
+def test_h1_t10_degraded_classification_semantics_preserved():
+    degraded = _agent(_Client(), _FailingClassifier())
+
+    answer = degraded.run(_ticket())
+
+    assert degraded.last_run.status == AgentRunStatus.COMPLETED
+    assert "customer_002" not in answer and "secret" not in answer
+    assert _is_idle(degraded)
+    # and a degraded (completed) trace is closed too
+    snapshot = degraded.last_run.model_dump_json()
+    degraded.execute_function_calls([_Call("late")])
+    assert degraded.last_run.model_dump_json() == snapshot
+
+
+# H1: a failing seal on the SUCCESS path does not break the returned answer.
+def test_h1_success_path_seal_failure_does_not_replace_result(monkeypatch):
+    _break_seal(monkeypatch)
+    agent = _agent(_Client())
+
+    assert agent.run(_ticket()) == "Safe answer."
+    assert agent.last_run.status == AgentRunStatus.COMPLETED
+    assert _is_idle(agent)
+
+
+# SV-1: successful run + failing _seal_trace(): result returned, COMPLETED trace
+# keeps finished_at, is closed for late events, lock/owner released, next run OK.
+def test_sv1_success_path_seal_failure_full_lifecycle(monkeypatch):
+    with monkeypatch.context() as patch:
+        _break_seal(patch)
+        agent = _agent(_Client())
+        answer = agent.run(_ticket("ticket_A", "customer_001"))
+
+    assert answer == "Safe answer."  # no exception reaches the caller
+    done = agent.last_run
+    assert done.status == AgentRunStatus.COMPLETED
+    assert done.finished_at is not None
+    assert not agent._run_lock.locked()
+    assert agent._run_owner is None and agent._run_active is False
+    assert SECRET not in done.model_dump_json()
+
+    snapshot = done.model_dump_json()
+    agent.execute_function_calls([_Call("late", "call_late")])
+    assert agent._writable_manager() is None
+    assert agent._trusted_state() is None
+    assert done.model_dump_json() == snapshot  # closed despite failed seal
+    assert mock_data.CASES == {}
+
+    agent.client = _Client(first_call=_Call("second"))
+    assert agent.run(_ticket("ticket_B", "customer_002")) == "Safe answer."
+    assert agent.last_run is not done
+    assert agent.last_run.status == AgentRunStatus.COMPLETED
+    assert [c.reason for c in mock_data.CASES.values()] == ["second"]
+
+
+# H1: manual AgentRunManager contract (F-5 baseline) is still writable.
+def test_h1_manual_run_manager_still_writable_after_closed_run(monkeypatch):
+    from supportops_agent.run_manager import AgentRunManager
+
+    _break_fail(monkeypatch)
+    _break_seal(monkeypatch)
+    agent = _agent(_Client(raise_exc=RuntimeError("orig")))
+    with pytest.raises(RuntimeError):
+        agent.run(_ticket())
+
+    manual = agent.run_manager = AgentRunManager("manual")
+    agent.execute_function_calls([_Call("m")])
+
+    assert len(manual.run.steps) == 1
+
+
+# H1 (review LOW-2): fail() interrupted after setting status but before
+# finished_at -> seal completes the metadata.
+def test_h1_partial_fail_gets_finished_at_from_seal(monkeypatch):
+    from supportops_agent.run_manager import AgentRunManager
+
+    def partial_fail(self, error=None):
+        self.run.status = AgentRunStatus.FAILED
+        raise _Secondary(SECRET)
+
+    monkeypatch.setattr(AgentRunManager, "fail", partial_fail)
+    original = RuntimeError("orig")
+    agent = _agent(_Client(raise_exc=original))
+
+    with pytest.raises(RuntimeError) as info:
+        agent.run(_ticket())
+
+    assert info.value is original
+    assert agent.last_run.status == AgentRunStatus.FAILED
+    assert agent.last_run.finished_at is not None

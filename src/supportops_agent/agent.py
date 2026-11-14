@@ -125,6 +125,12 @@ class SupportAgent:
         # `owner == текущий поток` означает, что поток сейчас внутри run() и run не
         # может завершиться, пока этот же поток исполняет вызов.
         self._run_owner: int | None = None
+        # Внутренний признак закрытия trace, независимый от `run.status`: run()
+        # ставит его на менеджер завершённого прогона ДО попытки запечатать trace.
+        # Если и fail(), и _seal_trace() отказали (status остался RUNNING), запись
+        # через публичные execution-методы всё равно закрыта. Это не публичный
+        # статус и не поле схемы trace.
+        self._closed_manager: AgentRunManager | None = None
 
     def _trusted_state(self) -> AgentState | None:
         """Trusted context активного прогона — только его потоку-владельцу.
@@ -258,6 +264,11 @@ class SupportAgent:
         if owner is not None and owner != threading.get_ident():
             return None
 
+        # Независимо от status: закрытый run() trace не принимает событий, даже
+        # если сам статус не удалось перевести из RUNNING (двойной отказ).
+        if manager is self._closed_manager:
+            return None
+
         if manager.run.status != AgentRunStatus.RUNNING:
             return None
 
@@ -324,13 +335,26 @@ class SupportAgent:
                 # Не подавляем: фиксируем безопасный код и пробрасываем как есть,
                 # в т.ч. KeyboardInterrupt/SystemExit — trace не остаётся RUNNING.
                 # str(exc) не пишем (PII/аргументы).
-                manager.fail(_failure_code(exc))
+                try:
+                    manager.fail(_failure_code(exc))
+                except BaseException:  # noqa: BLE001
+                    # Вторичный отказ диагностики не должен подменять исходное
+                    # исключение (F-1). Trace закрывается в finally ниже.
+                    # Ограничение: подавляется и вторичный KeyboardInterrupt/
+                    # SystemExit внутри fail() — наружу идёт исходное исключение.
+                    pass
                 raise
         finally:
             try:
-                # Если даже fail() прервали — trace всё равно запечатывается.
                 if manager is not None:
-                    self._seal_trace(manager)
+                    # Сначала независимый признак закрытия, потом попытка seal:
+                    # при отказе обоих механизмов запись всё равно закрыта.
+                    self._closed_manager = manager
+                    try:
+                        self._seal_trace(manager)
+                    except BaseException:  # noqa: BLE001
+                        # Отказ seal не заменяет исходное исключение (F-1/F-2).
+                        pass
             finally:
                 self._run_active = False
                 self._run_owner = None
@@ -342,6 +366,9 @@ class SupportAgent:
 
         if manager.run.status == AgentRunStatus.RUNNING:
             manager.run.status = AgentRunStatus.FAILED
+            manager.run.finished_at = datetime.now(UTC)
+        elif manager.run.finished_at is None:
+            # fail() прервали между установкой статуса и времени завершения.
             manager.run.finished_at = datetime.now(UTC)
 
     def _run_agent_loop(self, ticket: SupportTicket) -> str:
