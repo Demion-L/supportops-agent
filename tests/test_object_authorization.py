@@ -378,7 +378,7 @@ def test_foreign_data_absent_from_llm_context_and_trace(name, args):
     requested = next(iter(args.values()))
     _, llm_context, trace = _run_agent([_Call("c1", name, json.dumps(args))])
 
-    assert requested in trace  # эхо в аргументах trace есть: проверка не пустая
+    assert requested not in trace  # SR-4: значения аргументов в trace не пишутся
     for label, blob in (("llm_context", llm_context), ("trace", trace)):
         residue = blob.replace(requested, "<ECHO>")
         leaked = [m for m in FOREIGN_DATA if m in residue]
@@ -515,7 +515,7 @@ def test_missing_identity_agent_level_denial_carries_no_data_and_no_confirmation
     for out in outputs:
         assert out["output"] == str(IDENTITY_REQUIRED)  # ровно отказ, ничего больше
     steps = [s for s in agent.last_run.steps if s.step_type == AgentStepType.TOOL_EXECUTION]
-    assert [s.output for s in steps] == [IDENTITY_REQUIRED] * 3
+    assert [s.output for s in steps] == [{"output_field_count": len(IDENTITY_REQUIRED)}] * 3
     assert all(s.error is None for s in steps)
 
     blob = json.dumps(outputs) + agent.last_run.model_dump_json()

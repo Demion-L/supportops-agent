@@ -398,7 +398,7 @@ def test_f7_t9_full_agent_path_binds_case_to_ticket():
 
     step = _tool_step(agent)
     assert step.error is None
-    assert step.output["case"]["ticket_id"] == TICKET
+    assert set(step.output) == {"output_field_count"}
     assert [c.ticket_id for c in mock_data.CASES.values()] == [TICKET]
 
 

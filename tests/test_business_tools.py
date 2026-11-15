@@ -322,7 +322,9 @@ def test_agent_runs_new_tools_and_sends_registry_schemas():
     assert client.responses.calls[0]["tools"] == get_llm_tool_schemas()
     tool_steps = [s for s in agent.last_run.steps if s.step_type == "tool_execution"]
     assert [s.error for s in tool_steps] == [None, None]
-    assert tool_steps[0].output["decision"] == "allow"
+    # Результат инструмента уходит в LLM-контекст, но не в trace (SR-4).
+    assert "'decision': 'allow'" in str(client.responses.calls)
+    assert "decision" not in (tool_steps[0].output or {})
     assert len(mock_data.CASES) == 1
 
 

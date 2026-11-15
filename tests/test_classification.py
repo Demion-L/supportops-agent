@@ -206,7 +206,7 @@ def test_agent_records_classification_step_first_and_enriches_context():
     ]
     assert [s.step_number for s in steps] == [1, 2, 3]
     assert steps[0].error is None
-    assert steps[0].output["classification"]["primary_intent"] == "refund_request"
+    assert steps[0].output["primary_intent"] == "refund_request"
     assert "hospitalized" not in str(steps[0].input)  # текст обращения не в trace
     assert agent.last_run.status == AgentRunStatus.COMPLETED
 

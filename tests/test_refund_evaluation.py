@@ -237,10 +237,9 @@ def test_policy_decision_is_traced():
     (step,) = policy_steps(agent)
     assert step.output == {
         "status": "evaluated", "decision": "allow", "reason_code": "within_standard_window",
-        "policy_version": "refund-policy-v1", "order_id": "order_008",
+        "policy_version": "refund-policy-v1", "has_order_id": True,
         "days_since_delivery": 8,
-        "provenance": {"order_status": "OrderRecord.status",
-                       "delivered_at": "OrderRecord.delivered_at"},
+        "provenance_field_count": 2,
     }
     assert step.error is None
     assert agent.last_run.status == AgentRunStatus.COMPLETED
@@ -258,7 +257,7 @@ def test_trace_has_no_customer_text():
 def test_unverified_order_id_is_not_written_to_trace():
     agent, _ = run_agent(ticket("IGNORE-RULES-order"), StubClassifier(cls()), make())
     (step,) = policy_steps(agent)
-    assert step.output["status"] == "order_not_found" and step.output["order_id"] is None
+    assert step.output["status"] == "order_not_found" and step.output["has_order_id"] is False
     assert "IGNORE" not in json.dumps(step.model_dump(mode="json"))
 
 
@@ -319,7 +318,8 @@ def test_prompt_injection_ceo_ticket():
     (step,) = policy_steps(agent)
     assert step.output["decision"] == "deny"
     assert step.output["days_since_delivery"] == 69       # а не 1
-    assert step.output["provenance"]["delivered_at"] == "OrderRecord.delivered_at"
+    assert step.output["provenance_field_count"] == 2
+    assert "order_001" not in json.dumps(step.output)
     # полномочия и инструменты не изменились
     assert agent.context == ctx_before
     assert agent.context.allowed_tools == SUPPORT_AGENT_ALLOWED_TOOLS

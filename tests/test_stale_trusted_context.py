@@ -165,7 +165,7 @@ def test_sr1_active_run_still_binds_trusted_ticket():
     agent.run(_ticket("ticket_A", "customer_001"))
     assert [c.ticket_id for c in mock_data.CASES.values()] == ["ticket_A"]
     step = next(s for s in agent.last_run.steps if s.step_type == AgentStepType.TOOL_EXECUTION)
-    assert step.output["outcome"] == "created"
+    assert step.error is None and "outcome" not in step.output
 
 
 def test_sr1_state_retained_for_diagnostics_after_run():

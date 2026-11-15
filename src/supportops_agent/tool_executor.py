@@ -109,6 +109,26 @@ class ToolResult(BaseModel):
     diagnostic_type: str | None = None
 
 
+# Закрытый список безопасных категорий диагностики исключений политики. Динамические
+# имена классов (в т.ч. синтаксически валидные, напр. SYNTH_SECRET_ABC123) в trace/логи не
+# попадают: всё неизвестное заменяется фиксированным PolicyError.
+UNKNOWN_DIAGNOSTIC_TYPE = "PolicyError"
+SAFE_DIAGNOSTIC_TYPES = frozenset({
+    UNKNOWN_DIAGNOSTIC_TYPE,
+    "Exception", "RuntimeError", "ValueError", "TypeError", "KeyError", "IndexError",
+    "LookupError", "AttributeError", "AssertionError", "ArithmeticError",
+    "ZeroDivisionError", "NotImplementedError", "OSError", "TimeoutError",
+    "ConnectionError", "PermissionError", "FileNotFoundError", "RecursionError",
+    "UnicodeError", "ValidationError",
+})
+
+
+def safe_diagnostic_type(name: object) -> str:
+    if type(name) is str and name in SAFE_DIAGNOSTIC_TYPES:
+        return name
+    return UNKNOWN_DIAGNOSTIC_TYPE
+
+
 def _authorization_failure(
     call: ToolCall,
     decision: AuthorizationDecision,
@@ -156,7 +176,7 @@ def _authorize(
     except Exception as exc:
         # Текст исключения может содержать секреты/внутренние адреса: он не
         # попадает ни в ToolResult (-> LLM), ни в trace. Остаётся только тип.
-        diagnostic_type = type(exc).__name__
+        diagnostic_type = safe_diagnostic_type(type(exc).__name__)
         logger.error(
             "Authorization policy failed: tool=%s diagnostic_type=%s",
             call.name,
@@ -174,7 +194,15 @@ def _authorize(
     if outcome.decision == AuthorizationDecision.ALLOW:
         return None
 
-    return _authorization_failure(call, outcome.decision, outcome.reason_code)
+    # Политика — расширяемая точка: объект результата мог быть создан в обход
+    # валидации (model_construct/подкласс). В диагностику (ToolResult.error,
+    # trace, контекст LLM) идёт только значение из закрытого набора; иное — код
+    # POLICY_INVALID_RESULT. Решение (не ALLOW) при этом не меняется.
+    try:
+        reason = AuthorizationReason(outcome.reason_code)
+    except ValueError:
+        reason = AuthorizationReason.POLICY_INVALID_RESULT
+    return _authorization_failure(call, outcome.decision, reason)
 
 
 def execute_tool_call(

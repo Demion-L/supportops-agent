@@ -1,4 +1,5 @@
 import json
+import re
 import threading
 from datetime import UTC, datetime
 
@@ -6,15 +7,18 @@ from openai import OpenAI
 from pydantic import ValidationError
 
 from .classification import (
+    CLASSIFIER_MODEL_NAME,
     ClassificationError,
     ClassificationResult,
     TicketClassification,
     TicketClassifier,
+    TicketIntent,
     format_classification_context,
 )
 from .agent_state import AgentState
 from .authorization import (
     DEFAULT_POLICY,
+    AuthorizationReason,
     ExecutionContext,
     ToolAuthorizationPolicy,
 )
@@ -24,6 +28,7 @@ from .refund_evaluation import (
     RefundEvaluationResult,
     RefundEvaluationStatus,
 )
+from .policy import PolicyDecisionType
 from .refund_response import build_policy_context, compose_final_answer
 from .run_manager import AgentRunManager
 from .tool_executor import (
@@ -32,6 +37,7 @@ from .tool_executor import (
     ToolCall,
     ToolResult,
     execute_tool_call,
+    safe_diagnostic_type,
 )
 from supportops_agent.tool_definitions import get_llm_tool_schemas
 
@@ -50,6 +56,260 @@ CLASSIFICATION_FAILURE_RESPONSE = (
 _SAFE_CLASSIFICATION_KINDS = frozenset({"invalid_output", "api_error"})
 
 
+# --- SR-4: metadata-only trace -------------------------------------------------
+# Диагностический trace не содержит сырых бизнес-данных, ПД и произвольных
+# значений от LLM/инструментов. Ограничения применяются при формировании события,
+# ДО записи в AgentRunManager (публичный API менеджера не меняется). Они касаются
+# только trace и никогда — аргументов, передаваемых инструменту, или контекста LLM.
+UNKNOWN_TOOL_LABEL = "unknown_tool"
+_VALIDATION_STATUSES = ("valid", "invalid_json", "invalid_schema")
+_KNOWN_REASON_CODES = frozenset(r.value for r in AuthorizationReason)
+_UNKNOWN_REASON_CODE = "unknown_reason"
+
+TRACE_MAX_STRING = 512
+TRACE_MAX_KEY = 64
+TRACE_MAX_DEPTH = 5
+TRACE_MAX_NODES = 128
+TRACE_MAX_TOTAL_CHARS = 8192
+_TRUNCATED = "...[truncated]"
+
+
+def _bound_value(value, depth: int, budget: list[int]):
+    """Детерминированное ограничение значения (строки, ключи, глубина, узлы)."""
+
+    if budget[0] <= 0:
+        return "[budget_exceeded]"
+    budget[0] -= 1
+
+    # Точные типы: подклассы (с переопределёнными __str__/__eq__ и т.п.) не
+    # доверяются и заменяются меткой.
+    vtype = type(value)
+    if value is None or vtype is bool or vtype is float:
+        return value
+    if vtype is int:
+        return value if abs(value) < 10**15 else "[big_int]"
+    if vtype is str:
+        return value if len(value) <= TRACE_MAX_STRING else value[:TRACE_MAX_STRING] + _TRUNCATED
+    if depth >= TRACE_MAX_DEPTH:
+        return "[max_depth]"
+    if vtype is dict:
+        result: dict[str, object] = {}
+        for key, item in value.items():
+            if budget[0] <= 0:
+                result["_truncated"] = True
+                break
+            key_text = key if type(key) is str else f"[{type(key).__name__}_key]"
+            if len(key_text) > TRACE_MAX_KEY:
+                key_text = key_text[:TRACE_MAX_KEY] + _TRUNCATED
+            result[key_text] = _bound_value(item, depth + 1, budget)
+        return result
+    if vtype is list or vtype is tuple:
+        items = []
+        for item in value:
+            if budget[0] <= 0:
+                items.append("[budget_exceeded]")
+                break
+            items.append(_bound_value(item, depth + 1, budget))
+        return items
+    return "[unsupported_type]"
+
+
+def _bound_payload(payload: dict | None) -> dict | None:
+    if payload is None:
+        return None
+    # Ограничитель не должен влиять на жизненный цикл run() (в т.ч. подменять
+    # ClassificationError): любой сбой -> детерминированная метка.
+    try:
+        bounded = _bound_value(payload, 0, [TRACE_MAX_NODES])
+        if len(json.dumps(bounded)) > TRACE_MAX_TOTAL_CHARS:
+            return {"_truncated": True, "reason": "payload_too_large"}
+        return bounded
+    except Exception:  # noqa: BLE001
+        return {"_truncated": True, "reason": "bound_failed"}
+
+
+def _record_bounded(manager: AgentRunManager, step_type, *, input=None, output=None,
+                    error: str | None = None, **timing):
+    """Единственная точка записи событий из agent.py: ограничение до сохранения."""
+
+    if error is not None:
+        try:
+            error = (
+                _bound_value(error, 0, [1]) if type(error) is str else "[unsupported_type]"
+            )
+            if type(error) is not str:
+                error = "[unsupported_type]"
+        except Exception:  # noqa: BLE001
+            error = "[bound_failed]"
+    return manager.record(
+        step_type,
+        input=_bound_payload(input),
+        output=_bound_payload(output),
+        error=error,
+        **timing,
+    )
+
+
+# --- SR-4 / H5: диагностическое представление (только безопасные метаданные) ----
+_USAGE_KEYS = ("input_tokens", "output_tokens", "total_tokens")
+_USAGE_MAX = 10**9
+_KNOWN_INTENTS = frozenset(i.value for i in TicketIntent)
+_UNKNOWN_INTENT_LABEL = "unknown_intent"
+_KNOWN_MODELS = frozenset({MODEL_NAME, CLASSIFIER_MODEL_NAME})
+_UNKNOWN_MODEL_LABEL = "unknown_model"
+
+
+def _safe_usage(usage) -> dict[str, int] | None:
+    """Только известные числовые счётчики; иначе None (fail-closed).
+
+    Допускаются точные int (не bool) в [0, 10**9]. Неизвестные ключи, строки,
+    вложенные структуры, NaN/inf и отрицательные значения отбрасываются.
+    Без валидного total_tokens usage не сохраняется целиком: summary() суммирует
+    именно его. Учёт использования модели вне trace не затрагивается.
+    """
+
+    try:
+        if type(usage) is not dict:
+            return None
+        safe: dict[str, int] = {}
+        for key in _USAGE_KEYS:
+            value = usage.get(key)
+            if type(value) is int and 0 <= value <= _USAGE_MAX:
+                safe[key] = value
+        return safe if "total_tokens" in safe else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _safe_model(model) -> str:
+    """Имя модели для trace: только известные константы, иначе фиксированная метка."""
+
+    if type(model) is str and model in _KNOWN_MODELS:
+        return model
+    return _UNKNOWN_MODEL_LABEL
+
+
+def _safe_intent(intent) -> str:
+    value = intent.value if isinstance(intent, TicketIntent) else intent
+    if type(value) is str and value in _KNOWN_INTENTS:
+        return value
+    return _UNKNOWN_INTENT_LABEL
+
+
+def _classification_diagnostics(classification) -> dict[str, object]:
+    """Безопасное представление классификации для trace.
+
+    Только закрытые intents, булевы флаги и фиксированные метки. claimed_reason,
+    order_id и любые произвольные строки в trace не попадают (раскрывается лишь
+    факт наличия). Сам объект классификации не изменяется и не копируется.
+    """
+
+    try:
+        intents = [_safe_intent(i) for i in list(classification.intents)[: len(_KNOWN_INTENTS)]]
+        return {
+            "intents": intents,
+            "primary_intent": _safe_intent(classification.primary_intent),
+            "requires_clarification": classification.requires_clarification is True,
+            "exception_requested": classification.context.exception_requested is True,
+            "has_order_id": bool(classification.entities.order_id),
+            "has_claimed_reason": bool(classification.context.claimed_reason),
+        }
+    except Exception:  # noqa: BLE001 - диагностика не должна ломать прогон
+        return {"classification_summary_unavailable": True}
+
+
+def _answer_metadata(answer) -> dict[str, object]:
+    """Метаданные ответа клиенту: длина и факт генерации, без текста."""
+
+    return {
+        "answer_length": len(answer) if type(answer) is str else 0,
+        "response_generated": type(answer) is str and bool(answer),
+    }
+
+
+# --- H5 (review): POLICY_DECISION и diagnostic_type ------------------------------
+_KNOWN_POLICY_REASONS = frozenset({
+    # RefundPolicyEngine
+    "unknown_order_status", "already_refunded", "order_cancelled", "not_delivered_yet",
+    "missing_delivery_date", "delivery_date_in_future", "within_standard_window",
+    "within_grace_period", "outside_grace_period",
+    # RefundEvaluationOrchestrator
+    "not_a_refund_request", "classification_requires_clarification",
+    "order_id_conflict", "missing_order_id", "order_not_owned_by_customer",
+    "order_not_found", "facts_unavailable", "policy_engine_error",
+    "refund_evaluation_error",
+})
+_POLICY_VERSION_RE = re.compile(r"[a-z0-9._-]{1,32}")
+
+
+def _safe_policy_reason(code) -> str:
+    if type(code) is str and code in _KNOWN_POLICY_REASONS:
+        return code
+    return _UNKNOWN_REASON_CODE
+
+
+def _safe_diagnostic_type(name) -> str:
+    return safe_diagnostic_type(name)
+
+
+def _policy_decision_diagnostics(result) -> dict[str, object]:
+    """Безопасное представление результата оценки возврата для trace.
+
+    Закрытые enum-ы и коды, версия политики по строгому шаблону, ограниченное
+    число дней, булев факт наличия order_id и число полей provenance. Сами
+    order_id и provenance (значения) в trace не пишутся. Никогда не бросает.
+    """
+
+    try:
+        decision = result.decision
+        days = decision.days_since_delivery if decision else None
+        version = decision.policy_version if decision else None
+        status = result.status
+        return {
+            "status": status.value if isinstance(status, RefundEvaluationStatus) else _UNKNOWN_REASON_CODE,
+            "decision": (
+                decision.decision.value
+                if decision and isinstance(decision.decision, PolicyDecisionType)
+                else None
+            ),
+            "reason_code": _safe_policy_reason(result.reason_code),
+            "policy_version": (
+                version
+                if type(version) is str and _POLICY_VERSION_RE.fullmatch(version)
+                else None
+            ),
+            "has_order_id": bool(result.order_id),
+            "days_since_delivery": (
+                days if type(days) is int and 0 <= days <= 10**5 else None
+            ),
+            "provenance_field_count": (
+                len(result.provenance) if type(result.provenance) is dict else 0
+            ),
+        }
+    except Exception:  # noqa: BLE001
+        return {"policy_summary_unavailable": True}
+
+
+def _safe_tool_label(name) -> str:
+    """Имя инструмента для trace: только ключ реестра, иначе фиксированная метка."""
+
+    if type(name) is str and name in TOOL_REGISTRY:
+        return name
+    return UNKNOWN_TOOL_LABEL
+
+
+def _argument_metadata(item, tool_result: ToolResult) -> tuple[int, str]:
+    """(argument_count, validation_status) без значений и имён аргументов."""
+
+    try:
+        parsed = json.loads(item.arguments)
+    except Exception:  # noqa: BLE001 - любой отказ разбора = invalid_json
+        return 0, "invalid_json"
+    count = len(parsed) if isinstance(parsed, dict) else 0
+    if tool_result.error_type == INVALID_ARGUMENTS_CODE:
+        return count, "invalid_schema"
+    return count, "valid"
+
 
 class ConcurrentRunError(RuntimeError):
     """Второй run() на экземпляре, у которого уже есть активный прогон.
@@ -62,8 +322,9 @@ class ConcurrentRunError(RuntimeError):
 def _failure_code(exc: BaseException) -> str:
     """Детерминированная безопасная категория сбоя прогона (R1, P3).
 
-    Закрытая таблица по isinstance; текст и имя класса исключения наружу не
-    идут. validation_error — только pydantic ValidationError (в т.ч. неизвестный
+    Закрытая таблица по isinstance; текст исключения прогона и его имя класса наружу не
+    идут (имя класса исключения политики авторизации фиксируется отдельно как
+    diagnostic_type шага TOOL_EXECUTION). validation_error — только pydantic ValidationError (в т.ч. неизвестный
     инструмент из ToolCall) и JSONDecodeError; внутренний ValueError этим кодом
     не маркируется. Прочие Exception — agent_execution_error; не-Exception —
     unknown_error. Код только диагностический: на статус, re-raise, авторизацию
@@ -205,36 +466,43 @@ class SupportAgent:
 
         tool_outputs = []
 
-        for item in function_calls:
+        for index, item in enumerate(function_calls):
             started_at = datetime.now(UTC)
             tool_result = self.execute_function_call(item)
             finished_at = datetime.now(UTC)
             duration_ms = (finished_at - started_at).total_seconds() * 1000
 
-            try:
-                arguments = json.loads(item.arguments)
-            except json.JSONDecodeError:
-                arguments = item.arguments
-
             # Один снимок менеджера: проверка и запись — над одним объектом.
             manager = self._writable_manager()
             if manager is not None:
-                manager.record(
+                argument_count, validation_status = _argument_metadata(item, tool_result)
+                trace_input: dict[str, object] = {
+                    # call_id приходит от провайдера (произвольная строка): в trace
+                    # только порядковый номер вызова; связь с результатом для LLM
+                    # (function_call_output.call_id) не затронута.
+                    "call_index": index,
+                    "tool": _safe_tool_label(item.name),
+                    "argument_count": argument_count,
+                    "validation_status": validation_status,
+                }
+                if tool_result.diagnostic_type:
+                    reason = tool_result.reason_code
+                    trace_input["reason_code"] = (
+                        reason if reason in _KNOWN_REASON_CODES else _UNKNOWN_REASON_CODE
+                    )
+                    trace_input["diagnostic_type"] = _safe_diagnostic_type(
+                        tool_result.diagnostic_type
+                    )
+                _record_bounded(
+                    manager,
                     AgentStepType.TOOL_EXECUTION,
-                    input={
-                        "call_id": item.call_id,
-                        "tool": item.name,
-                        "arguments": arguments,
-                        **(
-                            {
-                                "reason_code": tool_result.reason_code,
-                                "diagnostic_type": tool_result.diagnostic_type,
-                            }
-                            if tool_result.diagnostic_type
-                            else {}
-                        ),
-                    },
-                    output=tool_result.output,
+                    input=trace_input,
+                    # Сырой результат инструмента в trace не пишется: только число полей.
+                    output=(
+                        None
+                        if tool_result.error is not None
+                        else {"output_field_count": len(tool_result.output or {})}
+                    ),
                     error=tool_result.error,
                     started_at=started_at,
                     finished_at=finished_at,
@@ -416,7 +684,7 @@ class SupportAgent:
         response = self._call_model(
             self._build_initial_input(ticket, classification, self.refund_result)
         )
-        self._record_llm_step({"message": ticket.message}, response)
+        self._record_llm_step({"message_length": len(ticket.message)}, response)
         state.response = response
 
         return state
@@ -465,14 +733,16 @@ class SupportAgent:
             raise
 
         finished_at = datetime.now(UTC)
-        self.run_manager.record(
+        _record_bounded(
+            self.run_manager,
             AgentStepType.CLASSIFICATION,
             input=input_payload,
+            # SR-4/H5: только закрытые метаданные; claimed_reason, order_id,
+            # response_id и произвольные поля usage в trace не пишутся.
             output={
-                "classification": result.classification.model_dump(mode="json"),
-                "model": result.model,
-                "response_id": result.response_id,
-                "usage": result.usage,
+                **_classification_diagnostics(result.classification),
+                "model": _safe_model(result.model),
+                "usage": _safe_usage(result.usage),
             },
             started_at=started_at,
             finished_at=finished_at,
@@ -511,24 +781,14 @@ class SupportAgent:
         if result.status == RefundEvaluationStatus.NOT_APPLICABLE:
             return None
 
-        decision = result.decision
         finished_at = datetime.now(UTC)
-        self.run_manager.record(
+        _record_bounded(
+            self.run_manager,
             AgentStepType.POLICY_DECISION,
             input={"refund_evaluation": True},
-            output={
-                "status": result.status.value,
-                "decision": decision.decision.value if decision else None,
-                "reason_code": result.reason_code,
-                "policy_version": decision.policy_version if decision else None,
-                "order_id": result.order_id,
-                "days_since_delivery": (
-                    decision.days_since_delivery if decision else None
-                ),
-                "provenance": result.provenance,
-            },
+            output=_policy_decision_diagnostics(result),
             error=(
-                result.reason_code
+                _safe_policy_reason(result.reason_code)
                 if result.status
                 in (
                     RefundEvaluationStatus.FACTS_UNAVAILABLE,
@@ -546,7 +806,8 @@ class SupportAgent:
         self, input_payload: dict, started_at: datetime, error: str, *, output: dict
     ) -> None:
         finished_at = datetime.now(UTC)
-        self.run_manager.record(
+        _record_bounded(
+            self.run_manager,
             AgentStepType.CLASSIFICATION,
             input=input_payload,
             output=output,
@@ -585,17 +846,19 @@ class SupportAgent:
         )
         self.state.step_count += 1
 
-        self._record_llm_step({"tool_outputs": tool_outputs}, self.state.response)
+        # Результаты инструментов уходят в LLM, но не в trace: только счётчик.
+        self._record_llm_step({"tool_output_count": len(tool_outputs)}, self.state.response)
 
     def _finish(self) -> str:
         llm_text = self.state.response.output_text
         answer, dropped = compose_final_answer(self.refund_result, llm_text)
 
-        output: dict[str, object] = {"answer": answer}
+        # Полный ответ возвращается клиенту, но в trace — только метаданные.
+        output: dict[str, object] = _answer_metadata(answer)
         if self.refund_result is not None:
             output["refund_llm_text_dropped"] = dropped
 
-        self.run_manager.record(AgentStepType.FINAL, output=output)
+        _record_bounded(self.run_manager, AgentStepType.FINAL, output=output)
 
         self.run_manager.complete()
 
@@ -604,10 +867,11 @@ class SupportAgent:
     def _finish_classification_failed(self) -> None:
         """Детерминированное завершение при ожидаемой ошибке классификации."""
 
-        self.run_manager.record(
+        _record_bounded(
+            self.run_manager,
             AgentStepType.FINAL,
             output={
-                "answer": CLASSIFICATION_FAILURE_RESPONSE,
+                **_answer_metadata(CLASSIFICATION_FAILURE_RESPONSE),
                 "degraded": True,
                 "classification_failed": True,
             },
@@ -625,12 +889,13 @@ class SupportAgent:
         return self.client.responses.create(**kwargs)
 
     def _record_llm_step(self, input_payload: dict, response) -> None:
-        self.run_manager.record(
+        _record_bounded(
+            self.run_manager,
             AgentStepType.LLM_CALL,
             input=input_payload,
             output={
-                "response_id": response.id,
+                # response_id — произвольная строка провайдера: в trace не пишется.
                 "model": MODEL_NAME,
-                "usage": self.extract_token_usage(response),
+                "usage": _safe_usage(self.extract_token_usage(response)),
             },
         )

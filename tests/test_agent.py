@@ -236,10 +236,9 @@ def test_agent_creates_execution_trace():
     assert llm_step.step_number == 1
     assert llm_step.step_type == AgentStepType.LLM_CALL
     assert llm_step.input == {
-        "message": "Where is my order order_001?",
+        "message_length": len("Where is my order order_001?"),
     }
     assert llm_step.output == {
-        "response_id": "response_1",
         "model": "gpt-4.1-mini",
         "usage": None,
     }
@@ -249,20 +248,13 @@ def test_agent_creates_execution_trace():
     assert tool_step.step_number == 2
     assert tool_step.step_type == AgentStepType.TOOL_EXECUTION
     assert tool_step.input == {
-        "call_id": "call_123",
+        "call_index": 0,
         "tool": "lookup_order",
-        "arguments": {
-            "order_id": "order_001",
-        },
+        "argument_count": 1,
+        "validation_status": "valid",
     }
-    assert tool_step.output == {
-        "order_id": "order_001",
-        "customer_id": "customer_001",
-        "status": "delivered",
-        "amount_cents": 12999,
-        "currency": "EUR",
-        "created_at": "2026-07-20",
-    }
+    # SR-4: сырой результат инструмента в trace не пишется (только метаданные).
+    assert tool_step.output == {"output_field_count": 6}
     assert tool_step.error is None
 
     assert tool_step.finished_at is not None
@@ -275,24 +267,8 @@ def test_agent_creates_execution_trace():
 
     assert second_llm_step.step_number == 3
     assert second_llm_step.step_type == AgentStepType.LLM_CALL
-    assert second_llm_step.input == {
-        "tool_outputs": [
-            {
-                "type": "function_call_output",
-                "call_id": "call_123",
-                "output": str({
-                    "order_id": "order_001",
-                    "customer_id": "customer_001",
-                    "status": "delivered",
-                    "amount_cents": 12999,
-                    "currency": "EUR",
-                    "created_at": "2026-07-20",
-                }),
-            }
-        ],
-    }
+    assert second_llm_step.input == {"tool_output_count": 1}
     assert second_llm_step.output == {
-        "response_id": "response_2",
         "model": "gpt-4.1-mini",
         "usage": None,
     }
@@ -304,7 +280,8 @@ def test_agent_creates_execution_trace():
     assert final_step.step_type == AgentStepType.FINAL
     assert final_step.input is None
     assert final_step.output == {
-        "answer": "Your order has been delivered.",
+        "answer_length": len("Your order has been delivered."),
+        "response_generated": True,
     }
     assert final_step.error is None
 
@@ -883,7 +860,9 @@ def test_execute_function_calls_returns_tool_outputs():
     step = agent.last_run.steps[0]
     assert step.step_type == AgentStepType.TOOL_EXECUTION
     assert step.input["tool"] == "lookup_order"
-    assert step.input["arguments"] == {"order_id": "order_001"}
+    assert step.input["argument_count"] == 1
+    assert step.input["validation_status"] == "valid"
+    assert "arguments" not in step.input
     assert step.error is None
 
 

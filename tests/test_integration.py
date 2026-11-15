@@ -199,7 +199,7 @@ def test_unknown_order_is_reported_back_to_customer_gracefully():
     assert agent.last_run.status == AgentRunStatus.COMPLETED
 
     tool_step = agent.last_run.steps[1]
-    assert tool_step.output is None
+    assert set(tool_step.output) == {"output_field_count"}
     assert tool_step.error is None
 
 

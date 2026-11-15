@@ -178,7 +178,8 @@ def test_trace_and_summary_structure(kind, tool_calls):
     assert final_step.step_type == AgentStepType.FINAL
     assert final_step.error is None
     assert final_step.output == {
-        "answer": EXPECTED_TEXT,
+        "answer_length": len(EXPECTED_TEXT),
+        "response_generated": True,
         "degraded": True,
         "classification_failed": True,
     }

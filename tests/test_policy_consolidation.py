@@ -217,7 +217,9 @@ def test_customer_claims_do_not_change_identity(message):
         Client(calls=[call]),
     )
     (step,) = [s for s in agent.last_run.steps if s.step_type == AgentStepType.TOOL_EXECUTION]
-    assert step.output["outcome"] == "order_not_verified" and "decision" not in step.output
+    llm_context = str(client.calls[1]["input"])
+    assert "order_not_verified" in llm_context and "decision" not in llm_context
+    assert set(step.output) == {"output_field_count"}
     (pol,) = [s for s in agent.last_run.steps if s.step_type == AgentStepType.POLICY_DECISION]
     assert pol.output["status"] == "ownership_not_verified" and pol.output["decision"] is None
     assert "does not meet" not in answer and "meets the refund" not in answer
@@ -225,9 +227,8 @@ def test_customer_claims_do_not_change_identity(message):
 
 def test_trusted_identity_comes_from_ticket_only():
     call = FnCall("check_refund_eligibility", '{"order_id": "order_008"}')
-    agent, _, _ = run(ticket("order_008", customer="customer_001"), Client(calls=[call]))
-    (step,) = [s for s in agent.last_run.steps if s.step_type == AgentStepType.TOOL_EXECUTION]
-    assert step.output["decision"] == "allow"
+    agent, client, _ = run(ticket("order_008", customer="customer_001"), Client(calls=[call]))
+    assert "'decision': 'allow'" in str(client.calls[1]["input"])
 
 
 def test_model_supplied_identity_in_arguments_is_rejected_by_agent():
