@@ -54,7 +54,7 @@ Mission state (SUPPORTOPS-SEC-003; source of truth: `monolith mission list` / `.
   - WP2 exception sanitization — done (`f7297d7`).
   - WP3 concurrent run isolation — done (`5d3b46d`).
   - WP3-H1 double-failure lifecycle hardening — done (`eb42b97`).
-  - SR-4 / SR-5 — awaiting discovery (not started).
-  - WP4 (final regression) — not started.
+  - SR-4 metadata-only trace — done (`5d1459c`).
+  - WP4 (final regression) — in progress (branch `test/supportops-sec003-wp4`, tests only).
 
 Story and Mission remain open; Story is not finalized.
