@@ -23,19 +23,17 @@ Phase 3 — Safety & Policy (status and scope: `context/maps/roadmap-index.md`).
 
 ## Current Story
 
-**Story:** SUPPORTOPS-SEC-003 — Object-Level Authorization & Response Fail-Closed
+No active story recorded.
 
-Phase 3 — Safety & Policy. Activated by owner approval (SUPPORTOPS-SEC003-M01 brief). Scope and
-Acceptance Criteria: `context/planned/SUPPORTOPS-SEC-003.md` (8 criteria, none met; open questions
-unresolved). Not finalized.
-
-Previous: —
+Previous recorded story: **SUPPORTOPS-SEC-003 — Object-Level Authorization & Response Fail-Closed** (COMPLETED 2026-11-15)
 
 ---
 
 ## Last Finalization
 
-No finalization recorded yet.
+**Story:** SUPPORTOPS-SEC-003 — Object-Level Authorization & Response Fail-Closed
+**Date:** 2026-11-15
+**Capsule:** `.monolith/memory/working/phases/phase-3/stories/story-supportops-sec-003-finalization.md`
 
 ---
 
