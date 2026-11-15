@@ -105,6 +105,7 @@ inside each document, not records in MONOLITH. Phase statuses above are unchange
 | 7 | [SUPPORTOPS-API-001](../planned/SUPPORTOPS-API-001.md) | FastAPI Service Layer | PLANNED | 4 |
 | 7 | [SUPPORTOPS-API-002](../planned/SUPPORTOPS-API-002.md) | Production Configuration & Observability | PLANNED | 4 |
 | 7 | [SUPPORTOPS-API-003](../planned/SUPPORTOPS-API-003.md) | Production Security & Deployment | PLANNED | 4 |
+| 7 | [SUPPORTOPS-API-004](../planned/SUPPORTOPS-API-004.md) | Service API Vertical Slice | PLANNED | 4 |
 
 Note: Agent Architecture research (EVAL-003) is placed in Phase 6 (owner decision); the Phase 6
 scope above now names it. `retrospective/todo-md-mapping.md` keeps its historical "no phase"
