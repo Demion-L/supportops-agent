@@ -95,7 +95,7 @@ def test_unreachable_server_fails_fast_with_fixed_error(database):
         p.open()
     assert time.time() - started < 8
     assert str(exc.value) == "Storage is unavailable."
-    assert exc.value.__cause__ is None and exc.value.__suppress_context__
+    assert exc.value.__cause__ is None and exc.value.__context__ is None
     assert p.closed
 
 
