@@ -236,3 +236,25 @@ def test_i8_security_errors_never_disclose_credentials_or_internals(pool, app, c
     text = " ".join(r.text for r in rs) + caplog.text
     for needle in (tampered, key, secret_part, PEPPER, "Traceback", "psycopg", "api_credentials"):
         assert needle not in text
+
+
+def test_gate_survives_use_from_two_event_loops(pool):
+    """Review M1: the same app served by two successive event loops must still shed with 503, not 500."""
+    inner = PostgresCredentialRepository(pool, touch_min_interval_seconds=0)
+
+    class Slow:
+        def get_by_prefix(self, prefix):
+            import time
+
+            time.sleep(0.2)
+            return inner.get_by_prefix(prefix)
+
+        def touch_last_used(self, cid):
+            inner.touch_last_used(cid)
+
+    app = create_app(SETTINGS, credentials=Slow(), v1_routers=[make_router()],
+                     max_concurrent_authentications=1, auth_queue_wait_seconds=0.01)
+    key, _ = issue(pool)
+    for _ in range(2):  # two distinct event loops
+        rs = asyncio.run(call(app, [("GET", "/v1/it/whoami", bearer(key))] * 6))
+        assert {r.status_code for r in rs} <= {200, 503} and 200 in {r.status_code for r in rs}
