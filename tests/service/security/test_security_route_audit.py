@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from fastapi import APIRouter, Depends, FastAPI, WebSocket
 from fastapi.testclient import TestClient
 
@@ -178,3 +180,42 @@ def test_router_level_scope_dependencies_still_enforce_scope_after_body_parsing(
     assert client.post("/v1/included-scope", content="{broken", headers={"content-type": "application/json"}).status_code == 401
     assert client.post("/v1/included-scope", json={"message": "x"}, headers=bearer(reader.key)).status_code == 403
     assert client.post("/v1/included-scope", content="{broken", headers=json_headers).status_code in {403, 422}
+
+
+def test_audit_detects_parameterised_catch_all_and_root_mount_shadowing():
+    """Review F3: routes outside the literal /v1 that can still serve /v1/... are reported."""
+    from fastapi import FastAPI
+    from fastapi.routing import APIRouter
+
+    from supportops_service.security.route_audit import find_unsecured_routes
+
+    def build(register):
+        app = FastAPI()
+        register(app)
+        return find_unsecured_routes(app)
+
+    assert build(lambda a: a.get("/{tenant}/secret")(lambda: 1))
+    assert build(lambda a: a.get("/{p:path}")(lambda: 1))
+    assert build(lambda a: a.get("/v{n}/x")(lambda: 1))
+    sub = FastAPI()
+    assert build(lambda a: a.mount("/", sub))
+    # harmless routes stay clean
+    assert build(lambda a: a.get("/healthz")(lambda: 1)) == []
+    assert build(lambda a: a.get("/items/{item_id}")(lambda: 1)) == []
+    assert build(lambda a: a.include_router(APIRouter())) == []
+
+
+def test_hostile_record_object_is_denied_not_500(env):
+    from conftest import bearer  # noqa: F401
+    from supportops_service.security.errors import Unauthenticated
+
+    issued = env.issue()
+
+    class Hostile:
+        @property
+        def credential_id(self):
+            raise RuntimeError("secret-dsn")
+
+    env.repo.records[issued.record.key_prefix] = Hostile()  # type: ignore[assignment]
+    with pytest.raises(Unauthenticated):
+        env.verifier.authenticate([f"Bearer {issued.key}"])

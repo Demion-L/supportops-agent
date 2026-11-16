@@ -38,6 +38,7 @@ class DenyReason(StrEnum):
     SCOPE = "scope"
     REPOSITORY_UNAVAILABLE = "repository_unavailable"
     NOT_CONFIGURED = "not_configured"
+    OVERLOADED = "overloaded"
 
 
 class SecurityError(Exception):

@@ -13,6 +13,7 @@ resulting ``TenantContext``.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Any, Final
 
@@ -36,9 +37,58 @@ _CONTEXT_KEY: Final = "supportops.verified_tenant_context"
 _REQUIRED_SCOPE_ATTR: Final = "required_scope"
 
 
-def install_security(app: FastAPI, verifier: CredentialVerifier) -> None:
-    """Attach the verifier and the security error handlers to an application."""
+DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS: Final = 8
+DEFAULT_AUTH_QUEUE_WAIT_SECONDS: Final = 1.0
+
+
+class AuthenticationGate:
+    """Bounds concurrent credential verifications (each holds a pool thread and, with the
+    PostgreSQL repository, a connection) so a flood of well-formed but unknown keys cannot
+    exhaust the shared threadpool or connection pool. Saturation fails closed: after a short
+    wait the request is refused with 503, never admitted unauthenticated. No Redis, no global
+    rate limiter: this is a concurrency cap only.
+    """
+
+    def __init__(
+        self,
+        max_concurrent: int = DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS,
+        queue_wait_seconds: float = DEFAULT_AUTH_QUEUE_WAIT_SECONDS,
+    ) -> None:
+        if not isinstance(max_concurrent, int) or max_concurrent < 1:
+            raise ValueError("max_concurrent must be >= 1")
+        if queue_wait_seconds < 0:
+            raise ValueError("queue_wait_seconds must be >= 0")
+        self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._wait = float(queue_wait_seconds)
+
+    async def authenticate(
+        self, verifier: CredentialVerifier, authorization_values: list[str]
+    ) -> TenantContext:
+        if self._semaphore.locked():
+            try:
+                await asyncio.wait_for(self._semaphore.acquire(), timeout=self._wait)
+            except TimeoutError:
+                raise AuthenticationUnavailable(DenyReason.OVERLOADED) from None
+        else:
+            await self._semaphore.acquire()  # free slot: completes without suspending
+        try:
+            return await run_in_threadpool(verifier.authenticate, authorization_values)
+        finally:
+            self._semaphore.release()
+
+
+def install_security(
+    app: FastAPI,
+    verifier: CredentialVerifier,
+    *,
+    max_concurrent_authentications: int = DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS,
+    auth_queue_wait_seconds: float = DEFAULT_AUTH_QUEUE_WAIT_SECONDS,
+) -> None:
+    """Attach the verifier, the authentication gate and the security error handlers."""
     app.state.credential_verifier = verifier
+    app.state.authentication_gate = AuthenticationGate(
+        max_concurrent_authentications, auth_queue_wait_seconds
+    )
     install_security_error_handlers(app)
 
 
@@ -79,6 +129,12 @@ def require_scope(scope: Scope) -> Callable[..., TenantContext]:
     return dependency
 
 
+def scope_required_by(call: object) -> Scope | None:
+    """The scope a ``require_scope(...)`` dependency demands, or ``None`` for any other callable."""
+    scope = getattr(call, _REQUIRED_SCOPE_ATTR, None)
+    return scope if isinstance(scope, Scope) else None
+
+
 def _required_scopes(dependant: Dependant) -> frozenset[Scope]:
     found: set[Scope] = set()
     for sub in dependant.dependencies:
@@ -108,9 +164,10 @@ class SecuredRoute(APIRoute):
             verifier = get_verifier(request)
             # Cheap format check on the event loop: junk never occupies a pool thread.
             parse_authorization(request.headers.getlist("authorization"))
-            context = await run_in_threadpool(
-                verifier.authenticate, request.headers.getlist("authorization")
-            )
+            gate = getattr(request.app.state, "authentication_gate", None)
+            if not isinstance(gate, AuthenticationGate):
+                raise AuthenticationUnavailable(DenyReason.NOT_CONFIGURED)
+            context = await gate.authenticate(verifier, request.headers.getlist("authorization"))
             for scope in required:
                 if scope not in context.scopes:
                     raise InsufficientScope(

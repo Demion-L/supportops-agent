@@ -31,6 +31,7 @@ from supportops_service.security.tenant_context import TenantContextError, build
 KEY_VERSION: Final = "sok1"
 MAX_HEADER_BYTES: Final = 128
 MIN_PEPPER_BYTES: Final = 32
+MIN_PEPPER_DISTINCT_BYTES: Final = 8
 _PEPPER_ID: Final = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 _KEY: Final = re.compile(r"sok1\.([a-z2-7]{12})\.([A-Za-z0-9_-]{43})")
 _HASH_LEN: Final = hashlib.sha256().digest_size
@@ -42,11 +43,19 @@ class SystemClock:
 
 
 class PepperSet:
-    """Server-side secrets keyed by ``pepper_id``. Values never appear in ``repr``."""
+    """Versioned server-side secrets keyed by ``pepper_id``. Values never appear in ``repr``.
 
-    __slots__ = ("_peppers",)
+    Several peppers coexist. Existing credentials are verified with the pepper named in their
+    stored ``pepper_id`` (:meth:`get`); an unknown id yields ``None`` and the verifier denies.
+    ``active_id`` names the pepper used for *new* credentials (:meth:`hash_for_new_key`); it is
+    optional so a verify-only set is valid. Nothing is ever removed or rotated automatically:
+    retiring a pepper is an explicit configuration change, after which credentials still bound to
+    it fail closed. Error messages are fixed text and never contain pepper material.
+    """
 
-    def __init__(self, peppers: Mapping[str, bytes]) -> None:
+    __slots__ = ("_active_id", "_peppers")
+
+    def __init__(self, peppers: Mapping[str, bytes], *, active_id: str | None = None) -> None:
         if not peppers:
             raise ValueError("at least one pepper is required")
         checked: dict[str, bytes] = {}
@@ -55,14 +64,57 @@ class PepperSet:
                 raise ValueError("invalid pepper id")
             if not isinstance(value, bytes) or len(value) < MIN_PEPPER_BYTES:
                 raise ValueError(f"pepper must be at least {MIN_PEPPER_BYTES} bytes")
+            if len(set(value)) < MIN_PEPPER_DISTINCT_BYTES:
+                raise ValueError("pepper has too little entropy")
             checked[pepper_id] = value
+        if len(set(checked.values())) != len(checked):
+            raise ValueError("pepper values must be distinct")
+        if active_id is not None and active_id not in checked:
+            raise ValueError("active pepper id is not in the set")
         self._peppers = checked
+        self._active_id = active_id
+
+    @classmethod
+    def from_config(
+        cls, *, active_id: str, active_value: str, previous: str | None = None
+    ) -> PepperSet:
+        """Build from already-read configuration strings (this module never reads the environment).
+
+        ``previous`` is a verify-only list ``"id=value,id=value"`` of retained older peppers.
+        Values must not contain ``,`` (use base64url/hex). Any problem raises ``ValueError`` with
+        fixed text that echoes neither ids nor values.
+        """
+        peppers: dict[str, bytes] = {active_id: active_value.encode("utf-8")}
+        for item in (previous or "").split(","):
+            item = item.strip()
+            if not item:
+                continue
+            pepper_id, sep, value = item.partition("=")
+            pepper_id = pepper_id.strip()
+            if not sep or not value or pepper_id in peppers:
+                raise ValueError("invalid previous peppers configuration")
+            peppers[pepper_id] = value.encode("utf-8")
+        return cls(peppers, active_id=active_id)
+
+    @property
+    def active_id(self) -> str | None:
+        return self._active_id
+
+    @property
+    def ids(self) -> frozenset[str]:
+        return frozenset(self._peppers)
 
     def get(self, pepper_id: object) -> bytes | None:
         return self._peppers.get(pepper_id) if isinstance(pepper_id, str) else None
 
+    def hash_for_new_key(self, prefix: str, secret: str) -> tuple[str, bytes]:
+        """``(pepper_id, key_hash)`` under the active pepper, for storing a new credential."""
+        if self._active_id is None:
+            raise ValueError("no active pepper configured")
+        return self._active_id, compute_key_hash(self._peppers[self._active_id], prefix, secret)
+
     def __repr__(self) -> str:
-        return f"PepperSet(ids={sorted(self._peppers)})"
+        return f"PepperSet(ids={sorted(self._peppers)}, active={self._active_id!r})"
 
     def __reduce__(self) -> object:  # pragma: no cover - defensive: never serialize secrets
         raise TypeError("PepperSet is not serializable")
@@ -218,7 +270,7 @@ def _read_record(record: object, expected_prefix: str) -> _RecordFields | None:
         scopes = record.scopes  # type: ignore[attr-defined]
         expires_at = record.expires_at  # type: ignore[attr-defined]
         revoked_at = record.revoked_at  # type: ignore[attr-defined]
-    except AttributeError:
+    except Exception:  # hostile/buggy record object (e.g. raising property): unusable, deny
         return None
     if not (isinstance(credential_id, str) and isinstance(tenant_id, str)):
         return None

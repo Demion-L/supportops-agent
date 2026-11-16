@@ -76,10 +76,13 @@ def test_agent_package_does_not_import_service_security():
 
 def test_credential_repository_is_confined_to_authentication_code():
     """Worker-side code must not be able to reach credentials (contract AC-11)."""
-    allowed_dirs = {"security", "repositories"}
+    # ``app.py`` is the API composition root (wires the repository into the verifier); it is the
+    # only module outside security/ and the credentials repository allowed to name these types.
     for p in SRC.rglob("*.py"):
         rel = p.relative_to(SRC)
-        if rel.parts[0] in allowed_dirs or rel.name == "interfaces.py":
+        if rel.parts[0] == "security" or rel.parts in {("interfaces.py",), ("app.py",)}:
+            continue
+        if rel.parts == ("repositories", "credentials.py"):
             continue
         assert "CredentialRepository" not in p.read_text() and "CredentialRecord" not in p.read_text(), rel
     worker = SRC / "worker"

@@ -14,18 +14,38 @@ which scope a route demands.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Collection
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
 
-from supportops_service.security.dependencies import SecuredRoute
+from supportops_service.security.dependencies import SecuredRoute, scope_required_by
 
 PROTECTED_PREFIX = "/v1"
 
 
 def _under_prefix(path: str, prefix: str) -> bool:
     return path == prefix or path.startswith(prefix + "/")
+
+
+def _segment_regex(segment: str) -> re.Pattern[str]:
+    out, pos = "", 0
+    for m in re.finditer(r"\{[^}:]+(:[^}]+)?\}", segment):
+        out += re.escape(segment[pos : m.start()]) + (".+" if m.group(1) else "[^/]+")
+        pos = m.end()
+    return re.compile(out + re.escape(segment[pos:]))
+
+
+def _can_serve_protected(path: str, prefix: str) -> bool:
+    """True if a route outside the literal prefix could still receive ``prefix`` requests:
+    root mounts/catch-alls, or a parameterised first segment that can equal the prefix segment."""
+    if path in ("", "/"):
+        return True
+    if "{" not in path:
+        return False
+    first = path.lstrip("/").split("/", 1)[0]
+    return "{" in first and _segment_regex(first).fullmatch(prefix.strip("/")) is not None
 
 
 def find_unsecured_routes(
@@ -43,7 +63,13 @@ def find_unsecured_routes(
     offenders: list[str] = []
     for ctx in iter_route_contexts(app.routes):
         path = ctx.path
-        if not isinstance(path, str) or not _under_prefix(path, prefix):
+        if not isinstance(path, str):
+            continue
+        if not _under_prefix(path, prefix):
+            if _can_serve_protected(path, prefix) and not (
+                isinstance(ctx.original_route, APIRoute) and isinstance(ctx.original_route, SecuredRoute)
+            ):
+                offenders.append(f"{type(ctx.original_route).__name__} {path or '/'} (shadows {prefix})")
             continue
         if path in public_paths:
             continue
@@ -52,4 +78,33 @@ def find_unsecured_routes(
             continue
         offenders.append(f"{type(original).__name__} {path}")
     # A mount's own path may be reported without a trailing slash; sort for stable output.
+    return sorted(offenders)
+
+
+def find_scopes_outside_route_signature(
+    app: FastAPI, *, prefix: str = PROTECTED_PREFIX
+) -> list[str]:
+    """Return ``"<METHODS> <path>"`` for protected routes whose scope sits in ``dependencies=``.
+
+    ``SecuredRoute`` reads scopes from the endpoint signature when the route is built. A scope
+    given through ``include_router(dependencies=...)`` or ``@router.get(dependencies=[...])`` is
+    still enforced by the dependency itself, but only *after* the body is parsed (malformed body
+    -> 422 instead of 403). Contract rule: declare ``Depends(require_scope(...))`` on the route.
+    Uses only public FastAPI attributes (``APIRoute.dependencies``, ``Depends.dependency``).
+    """
+    offenders: list[str] = []
+    for ctx in iter_route_contexts(app.routes):
+        # The context exposes the *effective* dependencies (including include_router-level ones);
+        # ``original_route.dependencies`` is the pre-include list and would miss them.
+        original = ctx.original_route
+        path = ctx.path
+        if not (isinstance(original, APIRoute) and isinstance(path, str)):
+            continue
+        if not _under_prefix(path, prefix):
+            continue
+        for dep in getattr(ctx, "dependencies", None) or original.dependencies:
+            if scope_required_by(getattr(dep, "dependency", None)) is not None:
+                methods = ",".join(sorted(original.methods or ()))
+                offenders.append(f"{methods} {path}")
+                break
     return sorted(offenders)
