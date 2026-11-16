@@ -2,7 +2,9 @@
 
 Nothing connects at import or construction time; the pool is opened and closed
 explicitly. Driver messages (which may contain host details) never leave this
-module: failures surface as :class:`StorageUnavailable` with fixed text.
+module: failures surface as :class:`StorageUnavailable` with fixed text. It is always
+raised outside the ``except`` block that caught the driver error, so the driver
+exception is neither ``__cause__`` nor ``__context__`` of the public error.
 """
 
 from __future__ import annotations
@@ -104,12 +106,15 @@ class DatabasePool:
 
     def open(self) -> None:
         """Open the pool and wait until it has a working connection."""
+        failed = False
         try:
             self._pool.open(wait=True, timeout=self._settings.open_timeout)
         except (PoolTimeout, psycopg.Error, PoolClosed):
+            failed = True
+        if failed:  # raised outside the handler: no driver exception stays in __context__
             self._pool.close()
             logger.warning("database pool failed to open")
-            raise StorageUnavailable() from None
+            raise StorageUnavailable()
 
     def close(self) -> None:
         """Close the pool and stop its workers. Idempotent."""
@@ -121,15 +126,28 @@ class DatabasePool:
         :class:`StorageUnavailable`; other errors from the body propagate unchanged
         (constraint violations are the caller's to interpret)."""
         stack = ExitStack()
+        failed = False
+        conn = None
         try:
             conn = stack.enter_context(self._pool.connection(timeout=self._settings.acquire_timeout))
         except (PoolTimeout, PoolClosed, psycopg.OperationalError):
-            raise StorageUnavailable() from None
+            failed = True
+        if failed:
+            raise StorageUnavailable()
         try:
             with stack:
                 yield conn
         except psycopg.OperationalError:
-            raise StorageUnavailable() from None
+            failed = True
+        if failed:
+            # contextlib calls us from inside its own handler for the body's exception, so
+            # Python would chain it as __context__ even from here: sever it explicitly.
+            error = StorageUnavailable()
+            try:
+                raise error
+            finally:
+                error.__context__ = None
+                error.__suppress_context__ = True
 
     def check(self) -> None:
         """Cheap liveness probe; raises :class:`StorageUnavailable`."""

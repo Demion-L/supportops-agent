@@ -24,3 +24,28 @@ class MigrationChecksumMismatch(MigrationError):
 
 class MigrationSetError(MigrationError):
     """Migration files or history are inconsistent (gap, duplicate, unknown version)."""
+
+
+class StorageFailure(RuntimeError):
+    """A database operation failed for a reason other than unavailability
+    (constraint violation, data error, ...). Fixed text: never SQL, values or driver messages."""
+
+    def __init__(self) -> None:
+        super().__init__("Storage operation failed.")
+
+
+class IdempotencyConflict(RuntimeError):
+    """The idempotency key was already used by this tenant with a different request.
+    Carries no data from the first request."""
+
+    def __init__(self) -> None:
+        super().__init__("Idempotency key was already used with a different request.")
+
+
+class InvalidRepositoryInput(ValueError):
+    """A repository argument violated the contract. Names no value, only the fixed text
+    for the offending field."""
+
+    def __init__(self, field: str) -> None:
+        super().__init__(f"Invalid {field}.")
+        self.field = field
