@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from conftest import bearer
 
-from supportops_service.security.contracts import Scope
+from supportops_service.interfaces import Scope
 from supportops_service.security.tenant_context import build_tenant_context, filter_scopes
 
 RID = {"X-Request-ID": "fixed-request-id-2"}

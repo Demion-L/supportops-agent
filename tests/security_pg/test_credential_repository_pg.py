@@ -20,7 +20,7 @@ from supportops_service.repositories.credentials import (
     CredentialStoreError,
     PostgresCredentialRepository,
 )
-from supportops_service.security.contracts import Scope
+from supportops_service.interfaces import Scope
 from supportops_service.security.credentials import (
     CredentialVerifier,
     PepperSet,

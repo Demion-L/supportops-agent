@@ -29,7 +29,7 @@ import re
 from contextlib import AbstractContextManager
 from typing import Any, Final, Protocol
 
-from supportops_service.security.contracts import CredentialRecord
+from supportops_service.interfaces import CredentialRecord
 
 logger = logging.getLogger("supportops_service.credentials_repository")
 

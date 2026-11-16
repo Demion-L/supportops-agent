@@ -98,6 +98,8 @@ async def _security_error_handler(request: Request, exc: Exception) -> JSONRespo
         _log_id(exc.tenant_id),
     )
     headers = {**exc.headers, REQUEST_ID_HEADER: request_id}
+    if exc.reason is DenyReason.OVERLOADED:
+        headers["Retry-After"] = "1"  # gate saturation only; other 503s carry no hint
     return JSONResponse(
         error_body(exc.code, exc.message, request_id), status_code=exc.status_code, headers=headers
     )

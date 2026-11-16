@@ -45,6 +45,11 @@ class ServiceSettings(BaseModel):
     environment: str = "local"
     # Only populated in Live Mode; excluded from repr by SecretStr.
     llm_api_key: SecretStr | None = None
+    # API-key verifier secret (HMAC pepper). No defaults; never in repr; read only here.
+    pepper: SecretStr | None = None
+    pepper_id: str | None = None  # id of the ACTIVE pepper (used for new credentials)
+    # Retained older peppers, verify-only: "id=value,id=value". Never in repr; read only here.
+    previous_peppers: SecretStr | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> ServiceSettings:
@@ -64,9 +69,20 @@ class ServiceSettings(BaseModel):
             if raw_key and raw_key.strip():
                 api_key = SecretStr(raw_key.strip())
 
+        raw_pepper = get("PEPPER")
+        pepper = SecretStr(raw_pepper.strip()) if raw_pepper and raw_pepper.strip() else None
+        raw_pepper_id = get("PEPPER_ID")
+        pepper_id = raw_pepper_id.strip() if raw_pepper_id and raw_pepper_id.strip() else None
+
+        raw_previous = get("PREVIOUS_PEPPERS")
+        previous = SecretStr(raw_previous.strip()) if raw_previous and raw_previous.strip() else None
+
         return cls(
             demo_mode=demo_mode,
             docs_enabled=docs_enabled,
             environment=environment,
             llm_api_key=api_key,
+            pepper=pepper,
+            pepper_id=pepper_id,
+            previous_peppers=previous,
         )

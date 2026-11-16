@@ -22,8 +22,7 @@ from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 from starlette.concurrency import run_in_threadpool
 
-from supportops_service.interfaces import TenantContext
-from supportops_service.security.contracts import Scope
+from supportops_service.interfaces import Scope, TenantContext
 from supportops_service.security.credentials import CredentialVerifier, parse_authorization
 from supportops_service.security.errors import (
     AuthenticationUnavailable,

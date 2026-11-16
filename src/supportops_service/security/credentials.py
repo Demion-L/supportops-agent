@@ -19,8 +19,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Final
 
-from supportops_service.interfaces import TenantContext
-from supportops_service.security.contracts import Clock, CredentialRepository
+from supportops_service.interfaces import Clock, CredentialRepository, TenantContext
 from supportops_service.security.errors import (
     AuthenticationUnavailable,
     DenyReason,

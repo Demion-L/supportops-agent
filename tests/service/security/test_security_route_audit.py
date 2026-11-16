@@ -11,7 +11,7 @@ from conftest import WriteBody, bearer
 from supportops_service.app import create_app
 from supportops_service.config import ServiceSettings
 from supportops_service.interfaces import TenantContext
-from supportops_service.security.contracts import Scope
+from supportops_service.interfaces import Scope
 from supportops_service.security.dependencies import (
     SecuredRoute,
     install_security,

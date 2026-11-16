@@ -96,3 +96,17 @@ def test_no_global_mutable_authentication_cache():
     for p in _py(SECURITY):
         text = p.read_text()
         assert "lru_cache" not in text and "cachetools" not in text and "@cache" not in text, p.name
+
+
+def test_temporary_contracts_module_is_gone_and_types_come_from_interfaces():
+    """After interface alignment there is one definition of each shared type (interfaces.py)."""
+    assert not (SECURITY / "contracts.py").exists()
+    for p in _py(SECURITY):
+        assert "security.contracts" not in p.read_text(), p.name
+    shared = {"Scope", "TenantContext", "CredentialRecord", "CredentialRepository", "Clock"}
+    defined: dict[str, list[str]] = {name: [] for name in shared}
+    for p in SRC.rglob("*.py"):
+        for node in ast.walk(ast.parse(p.read_text())):
+            if isinstance(node, ast.ClassDef) and node.name in shared:
+                defined[node.name].append(p.name)
+    assert defined == {name: ["interfaces.py"] for name in shared}

@@ -11,8 +11,7 @@ import re
 from collections.abc import Iterable
 from typing import Final
 
-from supportops_service.interfaces import TenantContext
-from supportops_service.security.contracts import Scope
+from supportops_service.interfaces import Scope, TenantContext
 
 _TENANT_ID: Final = re.compile(r"[a-z0-9][a-z0-9-]{0,62}")
 _CREDENTIAL_ID: Final = re.compile(r"[A-Za-z0-9_.:-]{1,128}")

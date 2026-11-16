@@ -20,20 +20,28 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from supportops_service.db.errors import (
+    IdempotencyConflict,
+    InvalidRepositoryInput,
+    StorageFailure,
+    StorageUnavailable,
+)
 from supportops_service.middleware import REQUEST_ID_HEADER, get_request_id
 
 logger = logging.getLogger("supportops_service")
 
 _FIXED: Final[dict[int, tuple[str, str]]] = {
     400: ("bad_request", "The request is invalid."),
-    401: ("unauthorized", "Authentication required."),
-    403: ("forbidden", "Access denied."),
+    401: ("unauthenticated", "Authentication required."),
+    403: ("insufficient_scope", "Access denied."),
     404: ("not_found", "Resource not found."),
+    409: ("idempotency_key_reuse", "Idempotency key was already used with a different request."),
     405: ("method_not_allowed", "Method not allowed."),
     413: ("payload_too_large", "Request body too large."),
     422: ("validation_error", "Request validation failed."),
     429: ("rate_limited", "Too many requests."),
     500: ("internal_error", "Internal server error."),
+    503: ("service_unavailable", "Service temporarily unavailable."),
 }
 _GENERIC_4XX: Final = ("client_error", "The request could not be processed.")
 _GENERIC_5XX: Final = _FIXED[500]
@@ -104,7 +112,30 @@ async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
     return _response(500, code, message, request)
 
 
+async def _storage_unavailable_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.warning("storage_unavailable type=%s", type(exc).__name__)
+    code, message = _FIXED[503]
+    return _response(503, code, message, request)  # no Retry-After: not a load-shedding signal
+
+
+async def _idempotency_conflict_handler(request: Request, exc: Exception) -> JSONResponse:
+    code, message = _FIXED[409]  # carries nothing from the first request
+    return _response(409, code, message, request)
+
+
+async def _storage_failure_handler(request: Request, exc: Exception) -> JSONResponse:
+    # StorageFailure (non-availability DB failure) and InvalidRepositoryInput (programming
+    # error) are server-side faults: fixed 500, class name only in the log.
+    logger.error("repository_failure type=%s", type(exc).__name__)
+    code, message = _FIXED[500]
+    return _response(500, code, message, request)
+
+
 def install_error_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(StorageUnavailable, _storage_unavailable_handler)
+    app.add_exception_handler(IdempotencyConflict, _idempotency_conflict_handler)
+    app.add_exception_handler(StorageFailure, _storage_failure_handler)
+    app.add_exception_handler(InvalidRepositoryInput, _storage_failure_handler)
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)
     app.add_exception_handler(RequestValidationError, _validation_handler)
     app.add_exception_handler(Exception, _unhandled_handler)

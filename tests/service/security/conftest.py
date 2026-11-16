@@ -13,8 +13,7 @@ from pydantic import BaseModel, ConfigDict
 
 from supportops_service.app import create_app
 from supportops_service.config import ServiceSettings
-from supportops_service.interfaces import TenantContext
-from supportops_service.security.contracts import CredentialRecord, Scope
+from supportops_service.interfaces import CredentialRecord, Scope, TenantContext
 from supportops_service.security.credentials import (
     CredentialVerifier,
     PepperSet,

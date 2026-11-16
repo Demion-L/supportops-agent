@@ -59,7 +59,10 @@ def _code_strings_and_names(tree):
 def test_repositories_never_reference_credentials_or_runs_queue():
     for p in FILES:
         for text in _code_strings_and_names(_tree(p)):
-            assert "api_credentials" not in text.lower(), p.name
+            # api_credentials belongs to the Alpha-owned credentials repository only (API-004
+            # integration); every ticket-side module must still never reference it.
+            if p.name != "credentials.py":
+                assert "api_credentials" not in text.lower(), p.name
             assert "runs_queue" not in text.lower(), p.name
 
 

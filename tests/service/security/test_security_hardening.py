@@ -15,8 +15,7 @@ from fastapi.testclient import TestClient
 
 from supportops_service.app import create_app
 from supportops_service.config import ServiceSettings
-from supportops_service.interfaces import TenantContext
-from supportops_service.security.contracts import Scope
+from supportops_service.interfaces import Scope, TenantContext
 from supportops_service.repositories.credentials import PostgresCredentialRepository
 from supportops_service.security.credentials import (
     CredentialVerifier,
