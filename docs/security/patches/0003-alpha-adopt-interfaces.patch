@@ -1,0 +1,222 @@
+diff --git a/src/supportops_service/repositories/credentials.py b/src/supportops_service/repositories/credentials.py
+index 10279e7..d689a6a 100644
+--- a/src/supportops_service/repositories/credentials.py
++++ b/src/supportops_service/repositories/credentials.py
+@@ -29,7 +29,7 @@ import re
+ from contextlib import AbstractContextManager
+ from typing import Any, Final, Protocol
+ 
+-from supportops_service.security.contracts import CredentialRecord
++from supportops_service.interfaces import CredentialRecord
+ 
+ logger = logging.getLogger("supportops_service.credentials_repository")
+ 
+diff --git a/src/supportops_service/security/contracts.py b/src/supportops_service/security/contracts.py
+deleted file mode 100644
+index c27b440..0000000
+--- a/src/supportops_service/security/contracts.py
++++ /dev/null
+@@ -1,59 +0,0 @@
+-"""PROPOSED shared types awaiting Beta's confirmation (see docs/security/api-004-interface-proposal.md).
+-
+-These definitions are the Alpha side of the agreed-upon interface. They are meant to move
+-VERBATIM into ``supportops_service/interfaces.py`` (owner: Beta) once Beta confirms, after which
+-this module becomes a re-export shim and is then deleted. Until then ``interfaces.py`` is not
+-modified.
+-
+-``TenantContext`` is deliberately NOT defined here: the single definition lives in
+-``supportops_service.interfaces``.
+-"""
+-
+-from __future__ import annotations
+-
+-from dataclasses import dataclass, field
+-from datetime import datetime
+-from enum import StrEnum
+-from typing import Protocol
+-
+-
+-class Scope(StrEnum):
+-    """Closed set of API scopes. Unknown strings are never granted."""
+-
+-    TICKETS_WRITE = "tickets:write"
+-    TICKETS_READ = "tickets:read"
+-    TRACE_READ = "trace:read"
+-
+-
+-@dataclass(frozen=True, slots=True)
+-class CredentialRecord:
+-    """Stored credential metadata. Never contains the raw key.
+-
+-    ``scopes`` holds raw strings on purpose: filtering to the closed ``Scope`` set happens in
+-    the security layer, so a corrupt/unknown value cannot crash a repository.
+-    """
+-
+-    credential_id: str
+-    tenant_id: str
+-    key_prefix: str
+-    key_hash: bytes = field(repr=False)
+-    pepper_id: str
+-    scopes: frozenset[str]
+-    expires_at: datetime | None = None
+-    revoked_at: datetime | None = None
+-
+-
+-class CredentialRepository(Protocol):
+-    """Credential lookup. Used only by the authentication layer (never by the worker)."""
+-
+-    def get_by_prefix(self, key_prefix: str) -> CredentialRecord | None: ...
+-
+-    def touch_last_used(self, credential_id: str) -> None:
+-        """Best-effort bookkeeping; must never influence an authentication decision."""
+-        ...
+-
+-
+-class Clock(Protocol):
+-    """Injectable time source (timezone-aware UTC) so expiry is testable."""
+-
+-    def now(self) -> datetime: ...
+diff --git a/src/supportops_service/security/credentials.py b/src/supportops_service/security/credentials.py
+index 7e7fdd8..02ce802 100644
+--- a/src/supportops_service/security/credentials.py
++++ b/src/supportops_service/security/credentials.py
+@@ -19,8 +19,7 @@ from dataclasses import dataclass, field
+ from datetime import UTC, datetime
+ from typing import Final
+ 
+-from supportops_service.interfaces import TenantContext
+-from supportops_service.security.contracts import Clock, CredentialRepository
++from supportops_service.interfaces import Clock, CredentialRepository, TenantContext
+ from supportops_service.security.errors import (
+     AuthenticationUnavailable,
+     DenyReason,
+diff --git a/src/supportops_service/security/dependencies.py b/src/supportops_service/security/dependencies.py
+index 52a2375..69cfb58 100644
+--- a/src/supportops_service/security/dependencies.py
++++ b/src/supportops_service/security/dependencies.py
+@@ -22,8 +22,7 @@ from fastapi.dependencies.models import Dependant
+ from fastapi.routing import APIRoute
+ from starlette.concurrency import run_in_threadpool
+ 
+-from supportops_service.interfaces import TenantContext
+-from supportops_service.security.contracts import Scope
++from supportops_service.interfaces import Scope, TenantContext
+ from supportops_service.security.credentials import CredentialVerifier, parse_authorization
+ from supportops_service.security.errors import (
+     AuthenticationUnavailable,
+diff --git a/src/supportops_service/security/tenant_context.py b/src/supportops_service/security/tenant_context.py
+index 0edcba6..3d0c235 100644
+--- a/src/supportops_service/security/tenant_context.py
++++ b/src/supportops_service/security/tenant_context.py
+@@ -11,8 +11,7 @@ import re
+ from collections.abc import Iterable
+ from typing import Final
+ 
+-from supportops_service.interfaces import TenantContext
+-from supportops_service.security.contracts import Scope
++from supportops_service.interfaces import Scope, TenantContext
+ 
+ _TENANT_ID: Final = re.compile(r"[a-z0-9][a-z0-9-]{0,62}")
+ _CREDENTIAL_ID: Final = re.compile(r"[A-Za-z0-9_.:-]{1,128}")
+diff --git a/tests/security_pg/test_credential_repository_pg.py b/tests/security_pg/test_credential_repository_pg.py
+index 54a065b..152f789 100644
+--- a/tests/security_pg/test_credential_repository_pg.py
++++ b/tests/security_pg/test_credential_repository_pg.py
+@@ -20,7 +20,7 @@ from supportops_service.repositories.credentials import (
+     CredentialStoreError,
+     PostgresCredentialRepository,
+ )
+-from supportops_service.security.contracts import Scope
++from supportops_service.interfaces import Scope
+ from supportops_service.security.credentials import (
+     CredentialVerifier,
+     PepperSet,
+diff --git a/tests/service/security/conftest.py b/tests/service/security/conftest.py
+index f934ce1..208de2c 100644
+--- a/tests/service/security/conftest.py
++++ b/tests/service/security/conftest.py
+@@ -13,8 +13,7 @@ from pydantic import BaseModel, ConfigDict
+ 
+ from supportops_service.app import create_app
+ from supportops_service.config import ServiceSettings
+-from supportops_service.interfaces import TenantContext
+-from supportops_service.security.contracts import CredentialRecord, Scope
++from supportops_service.interfaces import CredentialRecord, Scope, TenantContext
+ from supportops_service.security.credentials import (
+     CredentialVerifier,
+     PepperSet,
+diff --git a/tests/service/security/test_credential_repository_unit.py b/tests/service/security/test_credential_repository_unit.py
+index f78daaa..3737496 100644
+--- a/tests/service/security/test_credential_repository_unit.py
++++ b/tests/service/security/test_credential_repository_unit.py
+@@ -22,7 +22,7 @@ from supportops_service.repositories.credentials import (
+     CredentialStoreError,
+     PostgresCredentialRepository,
+ )
+-from supportops_service.security.contracts import Scope
++from supportops_service.interfaces import Scope
+ from supportops_service.security.credentials import (
+     CredentialVerifier,
+     PepperSet,
+diff --git a/tests/service/security/test_security_hardening.py b/tests/service/security/test_security_hardening.py
+index 42cb54f..3b20d39 100644
+--- a/tests/service/security/test_security_hardening.py
++++ b/tests/service/security/test_security_hardening.py
+@@ -15,8 +15,7 @@ from fastapi.testclient import TestClient
+ 
+ from supportops_service.app import create_app
+ from supportops_service.config import ServiceSettings
+-from supportops_service.interfaces import TenantContext
+-from supportops_service.security.contracts import Scope
++from supportops_service.interfaces import Scope, TenantContext
+ from supportops_service.repositories.credentials import PostgresCredentialRepository
+ from supportops_service.security.credentials import (
+     CredentialVerifier,
+diff --git a/tests/service/security/test_security_route_audit.py b/tests/service/security/test_security_route_audit.py
+index 0032d6d..c55ab41 100644
+--- a/tests/service/security/test_security_route_audit.py
++++ b/tests/service/security/test_security_route_audit.py
+@@ -11,7 +11,7 @@ from conftest import WriteBody, bearer
+ from supportops_service.app import create_app
+ from supportops_service.config import ServiceSettings
+ from supportops_service.interfaces import TenantContext
+-from supportops_service.security.contracts import Scope
++from supportops_service.interfaces import Scope
+ from supportops_service.security.dependencies import (
+     SecuredRoute,
+     install_security,
+diff --git a/tests/service/security/test_security_scopes_tenant.py b/tests/service/security/test_security_scopes_tenant.py
+index 3537801..a2b9282 100644
+--- a/tests/service/security/test_security_scopes_tenant.py
++++ b/tests/service/security/test_security_scopes_tenant.py
+@@ -5,7 +5,7 @@ from __future__ import annotations
+ import pytest
+ from conftest import bearer
+ 
+-from supportops_service.security.contracts import Scope
++from supportops_service.interfaces import Scope
+ from supportops_service.security.tenant_context import build_tenant_context, filter_scopes
+ 
+ RID = {"X-Request-ID": "fixed-request-id-2"}
+diff --git a/tests/service/security/test_security_static_boundaries.py b/tests/service/security/test_security_static_boundaries.py
+index e2550b7..860f7af 100644
+--- a/tests/service/security/test_security_static_boundaries.py
++++ b/tests/service/security/test_security_static_boundaries.py
+@@ -96,3 +96,17 @@ def test_no_global_mutable_authentication_cache():
+     for p in _py(SECURITY):
+         text = p.read_text()
+         assert "lru_cache" not in text and "cachetools" not in text and "@cache" not in text, p.name
++
++
++def test_temporary_contracts_module_is_gone_and_types_come_from_interfaces():
++    """After interface alignment there is one definition of each shared type (interfaces.py)."""
++    assert not (SECURITY / "contracts.py").exists()
++    for p in _py(SECURITY):
++        assert "security.contracts" not in p.read_text(), p.name
++    shared = {"Scope", "TenantContext", "CredentialRecord", "CredentialRepository", "Clock"}
++    defined: dict[str, list[str]] = {name: [] for name in shared}
++    for p in SRC.rglob("*.py"):
++        for node in ast.walk(ast.parse(p.read_text())):
++            if isinstance(node, ast.ClassDef) and node.name in shared:
++                defined[node.name].append(p.name)
++    assert defined == {name: ["interfaces.py"] for name in shared}

@@ -1,1 +1,2 @@
-"""Persistence repositories. Importing this package performs no I/O."""
+"""Persistence repositories (tickets, credentials). Importing this package performs no I/O
+and never opens a connection."""
