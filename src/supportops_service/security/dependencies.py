@@ -14,6 +14,7 @@ resulting ``TenantContext``.
 from __future__ import annotations
 
 import asyncio
+import weakref
 from collections.abc import Callable
 from typing import Any, Final
 
@@ -57,23 +58,36 @@ class AuthenticationGate:
             raise ValueError("max_concurrent must be >= 1")
         if queue_wait_seconds < 0:
             raise ValueError("queue_wait_seconds must be >= 0")
-        self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._max = max_concurrent
+        # One semaphore per running event loop: an asyncio.Semaphore binds to the loop that first
+        # contends for it and raises RuntimeError on another loop (review M1).
+        self._semaphores: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = (
+            weakref.WeakKeyDictionary()
+        )
         self._wait = float(queue_wait_seconds)
+
+    def _semaphore_for_loop(self) -> asyncio.Semaphore:
+        loop = asyncio.get_running_loop()
+        semaphore = self._semaphores.get(loop)
+        if semaphore is None:
+            semaphore = self._semaphores[loop] = asyncio.Semaphore(self._max)
+        return semaphore
 
     async def authenticate(
         self, verifier: CredentialVerifier, authorization_values: list[str]
     ) -> TenantContext:
-        if self._semaphore.locked():
+        semaphore = self._semaphore_for_loop()
+        if semaphore.locked():
             try:
-                await asyncio.wait_for(self._semaphore.acquire(), timeout=self._wait)
+                await asyncio.wait_for(semaphore.acquire(), timeout=self._wait)
             except TimeoutError:
                 raise AuthenticationUnavailable(DenyReason.OVERLOADED) from None
         else:
-            await self._semaphore.acquire()  # free slot: completes without suspending
+            await semaphore.acquire()  # free slot: completes without suspending
         try:
             return await run_in_threadpool(verifier.authenticate, authorization_values)
         finally:
-            self._semaphore.release()
+            semaphore.release()
 
 
 def install_security(

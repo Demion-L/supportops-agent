@@ -75,7 +75,7 @@ def _safe_path(loc: tuple[Any, ...], error_type: str) -> list[str | int]:
             path.append(item)
         elif index == last and error_type in _USER_KEY_TYPES:
             path.append("*")
-        elif isinstance(item, str) and _SAFE_NAME.match(item):
+        elif isinstance(item, str) and _SAFE_NAME.fullmatch(item):
             path.append(item)
         else:
             path.append("*")
@@ -98,7 +98,7 @@ async def _validation_handler(request: Request, exc: Exception) -> JSONResponse:
         fields.append(
             {
                 "path": _safe_path(tuple(err.get("loc", ())), error_type),
-                "type": error_type if _SAFE_NAME.match(error_type) else "invalid",
+                "type": error_type if _SAFE_NAME.fullmatch(error_type) else "invalid",
             }
         )
     code, message = _FIXED[422]
