@@ -25,6 +25,9 @@ where = ["src"]
 supportops_service = ["db/migrations/*.sql"]
 
 [tool.pytest.ini_options]
+# Импорт строго из текущего worktree: src/ и корень (evaluation/) имеют приоритет
+# над любым другим editable-установленным supportops_agent.
+pythonpath = ["src", "."]
 markers = [
     "postgres: needs a real PostgreSQL (SUPPORTOPS_TEST_DATABASE_URL); SUPPORTOPS_REQUIRE_PG=1 makes absence a failure",
 ]
