@@ -81,10 +81,10 @@ Concurrency cap only (per-process, no rate limit, no DoS claim); gate does not p
 
 Per the task, merge stops when `main` has foreign uncommitted changes or when merge would overwrite an untracked file:
 
-1. `main` worktree has an **uncommitted foreign edit** in `src/supportops_agent/classification.py`: stray text `что такое` appended to a docstring line (`"""…ограничение."""что такое`). The file currently has a **SyntaxError**, so any regression in `main` (including SEC-003) would fail.
+1. Earlier in this session `main` had an uncommitted foreign edit in `src/supportops_agent/classification.py` (stray text `что такое`, a SyntaxError). It was **reverted by the owner during the task**; re-check: `git diff` is empty and the file parses. No longer a blocker (the file was never touched by this work).
 2. Untracked `docs/security/api-004-security-contract.md` (365 lines) exists in `main` and the merge would overwrite it. Content compared with the integration version (revision 3): it is an older draft; differing lines are outdated wording (status "draft/nothing implemented", pre-integration error table, open questions now resolved). Not overwritten.
 
-Owner decision needed: (a) how to handle the `classification.py` edit (discard/commit/stash — not mine to touch), (b) permission to move the untracked draft aside (e.g. rename to `.orig` outside git) so the merge can proceed.
+Owner decision needed: permission to move the untracked draft aside (e.g. rename to `.orig` outside git) so the merge can proceed.
 
 ## 9. MONOLITH
 
