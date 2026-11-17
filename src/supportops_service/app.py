@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 
 from fastapi import APIRouter, FastAPI
@@ -24,6 +25,8 @@ from supportops_service.security.route_audit import (
     find_unsecured_routes,
 )
 
+logger = logging.getLogger("supportops_service.app")
+
 
 def create_app(
     settings: ServiceSettings | None = None,
@@ -33,6 +36,7 @@ def create_app(
     v1_routers: Sequence[APIRouter] = (),
     max_concurrent_authentications: int = DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS,
     auth_queue_wait_seconds: float = DEFAULT_AUTH_QUEUE_WAIT_SECONDS,
+    pool_max_size: int | None = None,
 ) -> FastAPI:
     """Build the app.
 
@@ -43,6 +47,11 @@ def create_app(
     ``/v1`` routers are mounted only together with a credential repository and a pepper, and
     only if every ``/v1`` route uses ``SecuredRoute``. Anything else is a startup error:
     the service never runs in an "open" mode.
+
+    ``max_concurrent_authentications`` (default 3) must be smaller than the size of a shared
+    connection pool. The pool size comes from ``pool_max_size`` or, if omitted, from the
+    credential repository; when neither is known the limit is only a concurrency cap and
+    resource isolation is **not** claimed (``app.state.authentication_gate.pool_isolation_verified``).
     """
     settings = settings if settings is not None else ServiceSettings.from_env()
     llm_mode = resolve_llm_mode(settings)  # fail-closed before anything is built
@@ -81,15 +90,23 @@ def create_app(
         except ValueError:
             # Fixed text: never echo the pepper or its id.
             raise ServiceConfigurationError("Invalid pepper configuration.") from None
+        known_pool_size = (
+            pool_max_size if pool_max_size is not None else getattr(credentials, "pool_max_size", None)
+        )
         try:
             install_security(
                 app,
                 CredentialVerifier(credentials, peppers, clock),
                 max_concurrent_authentications=max_concurrent_authentications,
                 auth_queue_wait_seconds=auth_queue_wait_seconds,
+                pool_max_size=known_pool_size,
             )
         except ValueError:
             raise ServiceConfigurationError("Invalid authentication gate configuration.") from None
+        if not app.state.authentication_gate.pool_isolation_verified:
+            logger.warning(
+                "authentication gate: connection pool size unknown; resource isolation not verified"
+            )
         for router in v1_routers:
             app.include_router(router)
 

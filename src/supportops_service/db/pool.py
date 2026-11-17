@@ -101,6 +101,11 @@ class DatabasePool:
         return f"<DatabasePool closed={self._pool.closed}>"
 
     @property
+    def max_size(self) -> int:
+        """Configured maximum number of connections (used to validate concurrency limits)."""
+        return self._settings.max_size
+
+    @property
     def closed(self) -> bool:
         return self._pool.closed
 

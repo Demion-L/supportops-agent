@@ -37,7 +37,9 @@ _CONTEXT_KEY: Final = "supportops.verified_tenant_context"
 _REQUIRED_SCOPE_ATTR: Final = "required_scope"
 
 
-DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS: Final = 8
+# MVP: 3 concurrent verifications against the default PostgreSQL pool of 4 (owner decision, M2):
+# at least one connection stays free for non-authentication work.
+DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS: Final = 3
 DEFAULT_AUTH_QUEUE_WAIT_SECONDS: Final = 1.0
 
 
@@ -53,12 +55,22 @@ class AuthenticationGate:
         self,
         max_concurrent: int = DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS,
         queue_wait_seconds: float = DEFAULT_AUTH_QUEUE_WAIT_SECONDS,
+        pool_max_size: int | None = None,
     ) -> None:
-        if not isinstance(max_concurrent, int) or max_concurrent < 1:
+        if not isinstance(max_concurrent, int) or isinstance(max_concurrent, bool) or max_concurrent < 1:
             raise ValueError("max_concurrent must be >= 1")
         if queue_wait_seconds < 0:
             raise ValueError("queue_wait_seconds must be >= 0")
+        if pool_max_size is not None:
+            if not isinstance(pool_max_size, int) or isinstance(pool_max_size, bool) or pool_max_size < 1:
+                raise ValueError("pool_max_size must be >= 1")
+            if max_concurrent >= pool_max_size:
+                # Shared pool: authentication must never be able to take every connection.
+                raise ValueError("max_concurrent must be < pool_max_size")
         self._max = max_concurrent
+        # True only when the pool size was known and the limit was checked against it.
+        # Unknown pool size => no isolation is claimed (the gate is then only a concurrency cap).
+        self.pool_isolation_verified = pool_max_size is not None
         # One semaphore per running event loop: an asyncio.Semaphore binds to the loop that first
         # contends for it and raises RuntimeError on another loop (review M1).
         self._semaphores: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = (
@@ -96,12 +108,16 @@ def install_security(
     *,
     max_concurrent_authentications: int = DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS,
     auth_queue_wait_seconds: float = DEFAULT_AUTH_QUEUE_WAIT_SECONDS,
+    pool_max_size: int | None = None,
 ) -> None:
-    """Attach the verifier, the authentication gate and the security error handlers."""
+    """Attach the verifier, the authentication gate and the security error handlers.
+
+    ``pool_max_size`` is the size of the connection pool shared with other work, if known;
+    the gate limit must then be strictly smaller (``ValueError`` otherwise).
+    """
+    gate = AuthenticationGate(max_concurrent_authentications, auth_queue_wait_seconds, pool_max_size)
     app.state.credential_verifier = verifier
-    app.state.authentication_gate = AuthenticationGate(
-        max_concurrent_authentications, auth_queue_wait_seconds
-    )
+    app.state.authentication_gate = gate
     install_security_error_handlers(app)
 
 

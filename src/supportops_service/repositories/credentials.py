@@ -80,6 +80,12 @@ class PostgresCredentialRepository:
     def __repr__(self) -> str:
         return "PostgresCredentialRepository()"
 
+    @property
+    def pool_max_size(self) -> int | None:
+        """Max connections of the underlying pool, or ``None`` if the pool does not say."""
+        size = getattr(self._pool, "max_size", None)
+        return size if isinstance(size, int) and not isinstance(size, bool) and size > 0 else None
+
     def get_by_prefix(self, key_prefix: str) -> CredentialRecord | None:
         if not isinstance(key_prefix, str) or _PREFIX.fullmatch(key_prefix) is None:
             return None  # cannot match a stored prefix (DB CHECK); no query, no injection surface
