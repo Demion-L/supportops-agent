@@ -1,0 +1,166 @@
+diff --git a/src/supportops_service/app.py b/src/supportops_service/app.py
+index 266deed..0dae2ef 100644
+--- a/src/supportops_service/app.py
++++ b/src/supportops_service/app.py
+@@ -15,7 +15,10 @@ from supportops_service.middleware import RequestContextMiddleware
+ from supportops_service.routers import health
+ from supportops_service.security.credentials import CredentialVerifier, PepperSet
+ from supportops_service.security.dependencies import install_security
+-from supportops_service.security.route_audit import find_unsecured_routes
++from supportops_service.security.route_audit import (
++    find_scopes_outside_route_signature,
++    find_unsecured_routes,
++)
+ 
+ 
+ def create_app(
+@@ -63,7 +66,12 @@ def create_app(
+         if pepper is None or pepper_id is None:
+             raise ServiceConfigurationError("Authentication requires a pepper and a pepper id.")
+         try:
+-            peppers = PepperSet({pepper_id: pepper.get_secret_value().encode("utf-8")})
++            previous = settings.previous_peppers
++            peppers = PepperSet.from_config(
++                active_id=pepper_id,
++                active_value=pepper.get_secret_value(),
++                previous=previous.get_secret_value() if previous is not None else None,
++            )
+         except ValueError:
+             # Fixed text: never echo the pepper or its id.
+             raise ServiceConfigurationError("Invalid pepper configuration.") from None
+@@ -74,4 +82,7 @@ def create_app(
+     # Startup guard: every /v1 route (and any WebSocket/Mount under /v1) must be secured.
+     if find_unsecured_routes(app):
+         raise ServiceConfigurationError("Unsecured /v1 route detected.")
++    # Scopes must be declared on the route itself (contract §3.6), not via router-level dependencies.
++    if find_scopes_outside_route_signature(app):
++        raise ServiceConfigurationError("Route-level scope declaration required.")
+     return app
+diff --git a/src/supportops_service/config.py b/src/supportops_service/config.py
+index e323869..1022c42 100644
+--- a/src/supportops_service/config.py
++++ b/src/supportops_service/config.py
+@@ -47,7 +47,9 @@ class ServiceSettings(BaseModel):
+     llm_api_key: SecretStr | None = None
+     # API-key verifier secret (HMAC pepper). No defaults; never in repr; read only here.
+     pepper: SecretStr | None = None
+-    pepper_id: str | None = None
++    pepper_id: str | None = None  # id of the ACTIVE pepper (used for new credentials)
++    # Retained older peppers, verify-only: "id=value,id=value". Never in repr; read only here.
++    previous_peppers: SecretStr | None = None
+ 
+     @classmethod
+     def from_env(cls, env: Mapping[str, str] | None = None) -> ServiceSettings:
+@@ -72,6 +74,9 @@ class ServiceSettings(BaseModel):
+         raw_pepper_id = get("PEPPER_ID")
+         pepper_id = raw_pepper_id.strip() if raw_pepper_id and raw_pepper_id.strip() else None
+ 
++        raw_previous = get("PREVIOUS_PEPPERS")
++        previous = SecretStr(raw_previous.strip()) if raw_previous and raw_previous.strip() else None
++
+         return cls(
+             demo_mode=demo_mode,
+             docs_enabled=docs_enabled,
+@@ -79,4 +84,5 @@ class ServiceSettings(BaseModel):
+             llm_api_key=api_key,
+             pepper=pepper,
+             pepper_id=pepper_id,
++            previous_peppers=previous,
+         )
+diff --git a/tests/service/test_pepper_rotation_wiring.py b/tests/service/test_pepper_rotation_wiring.py
+new file mode 100644
+index 0000000..f3161df
+--- /dev/null
++++ b/tests/service/test_pepper_rotation_wiring.py
+@@ -0,0 +1,91 @@
++"""create_app <-> pepper rotation wiring and scope-declaration startup guard (Beta-owned; Alpha patch 0004)."""
++
++from __future__ import annotations
++
++import pytest
++from fastapi import APIRouter, Depends
++from fastapi.testclient import TestClient
++
++from supportops_service.app import create_app
++from supportops_service.config import ServiceConfigurationError, ServiceSettings
++from supportops_service.interfaces import CredentialRecord, Scope, TenantContext
++from supportops_service.security.credentials import compute_key_hash, generate_api_key
++from supportops_service.security.dependencies import SecuredRoute, require_scope
++
++OLD = "old-pepper-0123456789abcdef-ABCDEFG"
++NEW = "new-pepper-0123456789abcdef-HIJKLMN"
++
++
++class Repo:
++    def __init__(self):
++        self.records = {}
++
++    def get_by_prefix(self, prefix):
++        return self.records.get(prefix)
++
++    def touch_last_used(self, credential_id):
++        pass
++
++
++def _issue(repo, pepper_id, pepper):
++    key = generate_api_key()
++    repo.records[key.prefix] = CredentialRecord(
++        credential_id=f"c-{pepper_id}", tenant_id="tenant-a", key_prefix=key.prefix,
++        key_hash=compute_key_hash(pepper.encode(), key.prefix, key.secret),
++        pepper_id=pepper_id, scopes=frozenset({"tickets:read"}),
++    )
++    return key.render()
++
++
++def _router():
++    router = APIRouter(prefix="/v1", route_class=SecuredRoute)
++
++    @router.get("/things")
++    def things(ctx: TenantContext = Depends(require_scope(Scope.TICKETS_READ))):
++        return {"credential_id": ctx.credential_id}
++
++    return router
++
++
++def _get(app, key):
++    with TestClient(app, raise_server_exceptions=False) as client:
++        return client.get("/v1/things", headers={"Authorization": f"Bearer {key}"})
++
++
++def test_old_and_new_pepper_coexist_and_a_dropped_pepper_fails_closed():
++    repo = Repo()
++    old_key, new_key = _issue(repo, "p1", OLD), _issue(repo, "p2", NEW)
++    both = ServiceSettings(pepper=NEW, pepper_id="p2", previous_peppers=f"p1={OLD}")  # type: ignore[arg-type]
++    app = create_app(both, credentials=repo, v1_routers=[_router()])
++    assert _get(app, old_key).json() == {"credential_id": "c-p1"}
++    assert _get(app, new_key).json() == {"credential_id": "c-p2"}
++
++    retired = ServiceSettings(pepper=NEW, pepper_id="p2")  # type: ignore[arg-type]
++    app = create_app(retired, credentials=repo, v1_routers=[_router()])
++    assert _get(app, old_key).status_code == 401
++    assert _get(app, new_key).status_code == 200
++
++
++@pytest.mark.parametrize("previous", ["p1", f"p2={OLD}", f"p1={OLD},p1={OLD}", "p1=short", "=x"])
++def test_malformed_previous_peppers_are_a_startup_error_without_echo(previous):
++    settings = ServiceSettings(pepper=NEW, pepper_id="p2", previous_peppers=previous)  # type: ignore[arg-type]
++    with pytest.raises(ServiceConfigurationError) as caught:
++        create_app(settings, credentials=Repo(), v1_routers=[_router()])
++    assert NEW not in str(caught.value) and OLD not in str(caught.value) and "short" not in str(caught.value)
++
++
++def test_settings_repr_hides_previous_peppers():
++    settings = ServiceSettings(pepper=NEW, pepper_id="p2", previous_peppers=f"p1={OLD}")  # type: ignore[arg-type]
++    assert OLD not in repr(settings) and NEW not in repr(settings)
++
++
++def test_router_level_scope_dependencies_are_a_startup_error():
++    router = APIRouter(prefix="/v1", route_class=SecuredRoute, dependencies=[Depends(require_scope(Scope.TICKETS_READ))])
++
++    @router.get("/things")
++    def things():
++        return {}
++
++    settings = ServiceSettings(pepper=NEW, pepper_id="p2")  # type: ignore[arg-type]
++    with pytest.raises(ServiceConfigurationError):
++        create_app(settings, credentials=Repo(), v1_routers=[router])
