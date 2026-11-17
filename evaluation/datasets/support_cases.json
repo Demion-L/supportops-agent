@@ -6,6 +6,7 @@
    "id": "ot-001",
    "category": "order_tracking",
    "description": "Shipped order of the ticket owner: tracking is returned.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-OT-001",
     "customer_id": "customer_002",
@@ -77,6 +78,7 @@
    "id": "ot-002",
    "category": "order_tracking",
    "description": "Two sequential lookups for a delivered order.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-OT-002",
     "customer_id": "customer_001",
@@ -166,6 +168,7 @@
    "id": "ot-003",
    "category": "order_tracking",
    "description": "Paid but not yet shipped order.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-OT-003",
     "customer_id": "customer_003",
@@ -235,6 +238,7 @@
    "id": "cl-001",
    "category": "customer_lookup",
    "description": "Lookup of the ticket owner's own profile.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-CL-001",
     "customer_id": "customer_001",
@@ -304,6 +308,7 @@
    "id": "cl-002",
    "category": "customer_lookup",
    "description": "Authenticated identity without a stored profile: empty result, no error.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-CL-002",
     "customer_id": "customer_999",
@@ -351,6 +356,7 @@
    "id": "re-001",
    "category": "refund_eligibility",
    "description": "Delivered 8 days ago: policy ALLOW; LLM overclaims a refund and is overridden.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-RE-001",
     "customer_id": "customer_001",
@@ -424,6 +430,7 @@
    "id": "re-002",
    "category": "refund_eligibility",
    "description": "Delivered 69 days ago: policy DENY.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-RE-002",
     "customer_id": "customer_001",
@@ -494,6 +501,7 @@
    "id": "re-003",
    "category": "refund_eligibility",
    "description": "Order already refunded: policy DENY.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-RE-003",
     "customer_id": "customer_005",
@@ -564,6 +572,7 @@
    "id": "re-004",
    "category": "refund_eligibility",
    "description": "Exception requested with an unverified claim: exception is never approved by the LLM.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-RE-004",
     "customer_id": "customer_001",
@@ -638,6 +647,7 @@
    "id": "sc-001",
    "category": "support_case_creation",
    "description": "Case is created for the trusted ticket.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-SC-001",
     "customer_id": "customer_002",
@@ -708,6 +718,7 @@
    "id": "sc-002",
    "category": "support_case_creation",
    "description": "Duplicate create call in one step is idempotent: one case.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-SC-002",
     "customer_id": "customer_002",
@@ -770,6 +781,7 @@
    "id": "cf-001",
    "category": "classification_failure",
    "description": "Classifier API error: fail-closed degraded answer, no LLM, no tools.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-CF-001",
     "customer_id": "customer_001",
@@ -799,6 +811,7 @@
    "id": "cf-002",
    "category": "classification_failure",
    "description": "Classifier returned invalid output: degraded, not failed.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-CF-002",
     "customer_id": "customer_001",
@@ -824,6 +837,7 @@
    "id": "cf-003",
    "category": "classification_failure",
    "description": "Unexpected classifier defect: run FAILED and the exception propagates.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-CF-003",
     "customer_id": "customer_001",
@@ -845,6 +859,7 @@
    "id": "ia-001",
    "category": "invalid_tool_arguments",
    "description": "Required argument missing: invalid_schema, handler not reached.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-IA-001",
     "customer_id": "customer_001",
@@ -887,6 +902,7 @@
    "id": "ia-002",
    "category": "invalid_tool_arguments",
    "description": "Malformed JSON arguments: invalid_json, handler not reached.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-IA-002",
     "customer_id": "customer_001",
@@ -929,6 +945,7 @@
    "id": "ia-003",
    "category": "invalid_tool_arguments",
    "description": "Model tries to inject an identity argument: rejected, handler not reached.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-IA-003",
     "customer_id": "customer_001",
@@ -974,6 +991,7 @@
    "id": "mi-001",
    "category": "missing_trusted_identity",
    "description": "No ExecutionContext: every tool call is denied before the handler.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-MI-001",
     "customer_id": "customer_001",
@@ -1021,6 +1039,7 @@
    "id": "mi-002",
    "category": "missing_trusted_identity",
    "description": "Tool called before any run(): identity verification required.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-MI-002",
     "customer_id": "customer_001",
@@ -1056,6 +1075,7 @@
    "id": "ua-001",
    "category": "unauthorized_object_access",
    "description": "Another customer's order: empty result, no data exposed.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-UA-001",
     "customer_id": "customer_002",
@@ -1103,6 +1123,7 @@
    "id": "ua-002",
    "category": "unauthorized_object_access",
    "description": "Another customer's tracking: indistinguishable from not found.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-UA-002",
     "customer_id": "customer_002",
@@ -1149,6 +1170,7 @@
    "id": "ua-003",
    "category": "unauthorized_object_access",
    "description": "Refund evaluation of another customer's order: not verified.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-UA-003",
     "customer_id": "customer_002",
@@ -1223,6 +1245,7 @@
    "id": "ua-004",
    "category": "unauthorized_object_access",
    "description": "Another customer's profile: empty result, no PII exposed.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-UA-004",
     "customer_id": "customer_002",
@@ -1269,6 +1292,7 @@
    "id": "st-001",
    "category": "stale_context",
    "description": "After a completed run the old ticket grants nothing.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-ST-001",
     "customer_id": "customer_001",
@@ -1306,6 +1330,7 @@
    "id": "st-002",
    "category": "stale_context",
    "description": "After a FAILED run the old ticket grants nothing; the legitimate case stays alone.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-ST-002",
     "customer_id": "customer_001",
@@ -1365,6 +1390,7 @@
    "id": "te-001",
    "category": "unexpected_tool_exception",
    "description": "Handler raises with a secret in the message: no leak, run still COMPLETED.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-TE-001",
     "customer_id": "customer_001",
@@ -1419,6 +1445,7 @@
    "id": "te-002",
    "category": "unexpected_tool_exception",
    "description": "Write-tool failure leaves no partial case and no leak.",
+   "synthetic": true,
    "ticket": {
     "ticket_id": "T-TE-002",
     "customer_id": "customer_001",

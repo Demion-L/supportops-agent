@@ -1,0 +1,50 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:b879e222863e81686e85680466ba41bba1f3523c0b0e383e7a8298d49eceaa6e",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:541fdc97efeea5f9f3314177ea4453e0431968b45cd61cfe1c845d382206012c",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "customer_id": "customer_001"
+            },
+            "name": "lookup_customer",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:da7f0732e36fdcea8260504e4110c0af5a93d2a5d5378f7b9b0dad0a5a43924f",
+      "response": {
+        "error_type": null,
+        "text": "I could not find that profile.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_ua-004",
+  "scenario_id": "ua-004",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

@@ -33,7 +33,7 @@ from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
 from supportops_agent.refund_evaluation import default_refund_evaluator
 from supportops_agent.tool_definitions import TOOL_REGISTRY
 
-from .fakes import FakeClassifier, FakeLLMClient
+from .fakes import FakeClassifier
 from .invariants import (
     GLOBAL_CANARIES,
     CallRecord,
@@ -42,6 +42,7 @@ from .invariants import (
     check_invariants,
 )
 from .metrics import METRIC_DEFINITIONS, MetricResult, compute_metrics
+from .recording import load_recordings, recording_filename, save_recording
 from .schemas import (
     SCHEMA_VERSION,
     Dataset,
@@ -51,8 +52,10 @@ from .schemas import (
     Scenario,
     ScenarioResult,
 )
+from .sources import FakeSource, LLMSource, Mode, RecordSource, ReplaySource
 
 DEFAULT_DATASET = Path(__file__).parent / "datasets" / "support_cases.json"
+DEFAULT_RECORDINGS = Path(__file__).parent / "recordings"
 REDACTED = "[REDACTED]"
 _FAULTS = {"RuntimeError": RuntimeError, "ValueError": ValueError}
 
@@ -185,6 +188,7 @@ def _compare(
     answer: str | None,
     probe_outputs: list[dict | None],
     run_args: list[dict | None],
+    expected_llm_calls: int,
 ) -> None:
     exp = scenario.expected
 
@@ -195,9 +199,9 @@ def _compare(
 
     # Число LLM-вызовов обязано совпасть со скриптом: лишний вызов (напр. LLM после
     # fail-closed классификации) или пропущенный — поведение агента, а не ошибка harness.
-    llm_ok = result.llm_calls == len(scenario.llm_script)
+    llm_ok = result.llm_calls == expected_llm_calls
     if not llm_ok:
-        miss("llm_calls", len(scenario.llm_script), result.llm_calls)
+        miss("llm_calls", expected_llm_calls, result.llm_calls)
 
     # Outcome + проверки результата -> Task Success.
     if exp.outcome is not None:
@@ -279,7 +283,10 @@ def _compare(
             result.tool_selection_correct = False
 
 
-def run_scenario(scenario: Scenario) -> ScenarioResult:
+def run_scenario(scenario: Scenario, source: LLMSource | None = None) -> ScenarioResult:
+    """Один сценарий. `source` — fake (по умолчанию), replay или record (sources.py)."""
+
+    source = source or FakeSource()
     result = ScenarioResult(scenario_id=scenario.id, category=scenario.category)
     canaries = (
         *GLOBAL_CANARIES,
@@ -294,7 +301,8 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
         return result
 
     env = _Env()
-    client = FakeLLMClient(scenario.llm_script)
+    llm = source.open(scenario)
+    client = llm.client
     classifier = FakeClassifier(scenario.classifier) if scenario.classifier else None
     exception_type: str | None = None
     answer: str | None = None
@@ -325,6 +333,8 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
 
         run = agent.last_run
         cases = dict(mock_data.CASES)
+        # Недостающие вызовы replay / финализация записи — внутри изоляции.
+        source_error = llm.finish()
 
     # --- наблюдаемые факты ---
     result.outcome = _derive_outcome(run, exception_type)
@@ -375,12 +385,16 @@ def run_scenario(scenario: Scenario) -> ScenarioResult:
         )
     )
 
-    _compare(scenario, result, answer, probe_outputs, run_args)
+    _compare(scenario, result, answer, probe_outputs, run_args, llm.expected_llm_calls)
+    if source_error is not None:
+        # Расхождение источника LLM (replay/record) — диагностируемая ошибка harness,
+        # а не успех и не оценка агента: сценарий исключается из метрик.
+        result.harness_error = source_error
     return result
 
 
-def run_dataset(dataset: Dataset) -> list[ScenarioResult]:
-    return [run_scenario(s) for s in dataset.scenarios]
+def run_dataset(dataset: Dataset, source: LLMSource | None = None) -> list[ScenarioResult]:
+    return [run_scenario(s, source) for s in dataset.scenarios]
 
 
 # --- загрузка и отчёт ----------------------------------------------------------
@@ -406,6 +420,10 @@ def build_report(
     dataset_sha256: str,
     results: Sequence[ScenarioResult],
     metrics: Sequence[MetricResult] | None = None,
+    *,
+    mode: Mode = Mode.DETERMINISTIC_FAKE,
+    recordings: Sequence = (),
+    not_replayed: Sequence[str] = (),
 ) -> dict:
     """Детерминированный отчёт: без времён, uuid, длительностей и текстов ответов."""
 
@@ -419,8 +437,23 @@ def build_report(
         "schema_version": SCHEMA_VERSION,
         "dataset_id": dataset.dataset_id,
         "dataset_sha256": dataset_sha256,
+        # Режимы не смешиваются: отчёты разных режимов не сопоставимы как оценка модели.
+        "mode": mode.value,
+        "llm": {
+            "real_llm_calls": 0,
+            "model_quality_claim": False,
+            "recordings": sorted(
+                ({"recording_id": r.recording_id, "integrity": r.integrity} for r in recordings),
+                key=lambda r: r["recording_id"],
+            ),
+            "not_replayed": sorted(not_replayed),
+        },
         "scenario_count": len(results),
         "harness_errors": sorted(r.scenario_id for r in results if r.harness_error),
+        # Нарушения безопасности у исключённых из метрик сценариев не должны исчезать.
+        "security_violations_in_excluded": sorted(
+            r.scenario_id for r in results if r.harness_error and r.security_violations
+        ),
         "metrics": {
             m.name: {**m.model_dump(exclude={"name"}), "definition": METRIC_DEFINITIONS[m.name]}
             for m in metrics
@@ -439,7 +472,7 @@ def render_report(report: dict) -> str:
 
 
 def summarize(report: dict) -> str:
-    lines = [f"dataset={report['dataset_id']} scenarios={report['scenario_count']}"]
+    lines = [f"dataset={report['dataset_id']} mode={report['mode']} scenarios={report['scenario_count']}"]
     for name, m in report["metrics"].items():
         value = "n/a" if m["value"] is None else f"{m['value']:.4f}"
         lines.append(f"  {name}: {value} ({m['numerator']}/{m['denominator']})")
@@ -453,16 +486,59 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--fail-on-mismatch", action="store_true")
+    parser.add_argument(
+        "--mode",
+        choices=("fake", "replay", "synthetic-record"),
+        default="fake",
+        help=(
+            "fake: deterministic_fake; replay: recorded_replay; "
+            "synthetic-record: synthetic_recording (запись синтетического FakeLLMClient, не реальной модели)"
+        ),
+    )
+    parser.add_argument("--recordings", type=Path, default=DEFAULT_RECORDINGS)
     args = parser.parse_args(argv)
 
     dataset, digest = load_dataset(args.dataset)
-    results = run_dataset(dataset)
-    report = build_report(dataset, digest, results)
+    recordings: list = []
+    not_replayed: list[str] = []
+
+    if args.mode == "fake":
+        mode, source = Mode.DETERMINISTIC_FAKE, FakeSource()
+    elif args.mode == "replay":
+        loaded = load_recordings(args.recordings)
+        mode, source = Mode.RECORDED_REPLAY, ReplaySource(loaded)
+        known = {s.id for s in dataset.scenarios}
+        if set(loaded) - known:
+            print("recordings reference unknown scenarios", file=sys.stderr)
+            return 2
+        not_replayed = [s.id for s in dataset.scenarios if s.id not in loaded]
+        dataset = dataset.model_copy(update={"scenarios": [s for s in dataset.scenarios if s.id in loaded]})
+        recordings = list(loaded.values())
+    else:
+        mode, source = Mode.SYNTHETIC_RECORDING, RecordSource()
+
+    results = run_dataset(dataset, source)
+
+    if args.mode == "synthetic-record":
+        clean = {r.scenario_id for r in results if not (r.mismatches or r.security_violations or r.harness_error)}
+        for sid, recording in sorted(source.recordings.items()):
+            if sid not in clean:
+                print(f"not saved (scenario has findings): {sid}", file=sys.stderr)
+                continue
+            save_recording(recording, args.recordings / recording_filename(sid))
+        recordings = list(source.recordings.values())
+        print(f"recorded={len(source.recordings)} refused={sorted(source.refusals) or 'none'}")
+
+    report = build_report(
+        dataset, digest, results, mode=mode, recordings=recordings, not_replayed=not_replayed
+    )
     if args.output:
         args.output.write_text(render_report(report), encoding="utf-8")
     print(summarize(report))
 
-    failing = any(r.mismatches or r.security_violations or r.harness_error for r in results)
+    failing = bool(not_replayed) or any(
+        r.mismatches or r.security_violations or r.harness_error for r in results
+    )
     return 1 if (args.fail_on_mismatch and failing) else 0
 
 

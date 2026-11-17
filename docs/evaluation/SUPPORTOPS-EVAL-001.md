@@ -12,7 +12,7 @@
 | Этап | Содержание | Статус |
 |---|---|---|
 | EVAL-M01 Evaluation Architecture | схема сценария, формат expected outcome, метрики, критерии приёмки | **WP1 выполнен** |
-| EVAL-M02 Deterministic Harness | запуск, сравнение, фиксация ошибок, воспроизводимость (расширение: CI-режим, запись/replay реальных ответов) | не начат |
+| EVAL-M02 Deterministic Harness | запуск, сравнение, фиксация ошибок, воспроизводимость; WP1 — Record & Replay | **WP1 выполнен** |
 | EVAL-M03 Security & Behavioral | adversarial-сценарии, forbidden tool, tenant boundary, fail-closed, sanitization | не начат (часть инвариантов уже заложена) |
 | EVAL-M04 Reports | агрегаты, regression comparison, отчёт о качестве | не начат |
 
@@ -102,3 +102,70 @@ unexpected tool exception 2). Данные — только из `mock_data` (+ 
 2. Подмена `ToolDefinition.handler` глобальна → запуск строго последовательный.
 3. Агент не помечает прогон degraded при сбое инструмента (COMPLETED + `failed_tool_calls>0`); harness фиксирует это как есть.
 4. Неизвестный инструмент от модели приводит к FAILED прогона (`execute_function_call` пробрасывает ошибку) — кандидат на EVAL-M03.
+
+## EVAL-M02/WP1 — Record & Replay
+
+Отдельный слой Evaluation; `src/**`, SupportAgent, Authorization Gate, RefundPolicyEngine, ToolExecutor, RunManager не изменялись.
+Подключение — только через существующий DI (`client`); классификатор остаётся скриптованным (`FakeClassifier`) и в запись не входит.
+
+```text
+evaluation/
+  recording.py   схема записи v1, канонический JSON, integrity, гейт безопасности, проекция и fingerprint запроса, atomic save/load
+  recorder.py    RecordingLLMClient / RecordingSession: allowlist-запись поверх upstream
+  replay.py      ReplayLLMClient: ответы из записи, без сети и SDK; fail-closed
+  sources.py     Mode + FakeSource / ReplaySource / RecordSource — источники LLM-ответов для единого Runner
+  recordings/    синтетические записи 27 сценариев (<id>.recording.json)
+```
+
+Запуск: `python -m evaluation.runner --mode fake|replay|synthetic-record [--recordings DIR] [--output FILE] [--fail-on-mismatch]`.
+
+### Режимы (не смешиваются; поле `mode` отчёта)
+
+| Режим | Что это | Что доказывает |
+|---|---|---|
+| `deterministic_fake` | скрипт fake LLM из датасета | регрессии агентной логики |
+| `recorded_replay` | ответы из записи, проверка fingerprint запросов | регрессии агентной логики; **не** качество новой версии LLM |
+| `synthetic_recording` | запись синтетического `FakeLLMClient` | **не** запись реальной модели; реальные LLM-вызовы запрещены (`LiveUpstreamNotEnabled`); сценарий без `synthetic: true` отвергается |
+
+Отчёт: `llm.real_llm_calls = 0`, `llm.model_quality_claim = false`. Ни один режим WP1 не обращается к реальной LLM.
+
+### Запись (schema_version = 1)
+
+`schema_version, recording_id, scenario_id, model, source, data_class, status, interactions[], integrity`.
+Взаимодействие: `sequence`, `request_fingerprint`, `response` = `type (text|tool_calls|error)`, `text`, `tool_calls[{name, arguments|raw_arguments}]`, `error_type` (allowlist классов), `usage` (числа).
+Не сохраняются: сырые запросы/ответы, заголовки, id ответа/вызова провайдера, тексты исключений, tool results. `integrity` — sha256 тела записи (защита от порчи, **не подпись**).
+
+### Fingerprint
+
+sha256 канонической проекции запроса: модель, состав схем инструментов (имя + sha256 схемы), порядковая ссылка на предыдущий ответ, роли и sha256 текстов, порядковые ссылки на tool-вызовы и sha256 их выводов, прочие параметры. Это проверка **совместимости**, не обезличивание: sha256 низкоэнтропийных ПД анонимным не считается, поэтому в запись допускаются только синтетические тексты (пользовательский текст обязан быть явно объявлен сценарием; остальное проходит гейт).
+
+### Контракт синтетических данных (L1)
+
+* Каждый сценарий, из которого делается запись, несёт явное `synthetic: true` (`StrictBool`; `"true"`, `1` не принимаются). Датасет `support_cases` — все 27 сценариев мигрированы.
+* Отсутствие поля или `synthetic: false` → отказ `synthetic_not_declared` **до** обращения к upstream, даже для сценария без LLM-вызовов; запись не создаётся.
+* Декларация — **необходимое, но не достаточное** условие и **не доказательство отсутствия ПД**: содержимое всё равно проходит allowlist-схему и гейт (`scan_*`), а пользовательский текст обязан совпадать с объявленным `ticket.message`. Ошибочная декларация гейт не обходит (тест `test_l1_declaration_is_not_proof_content_gate_still_applies`).
+* Неизвестные поля сценария отвергаются (`extra="forbid"`). Нового PII-классификатора, LLM-проверки синтетичности и отдельной инфраструктуры Data Governance нет.
+* Остаточное ограничение: `declared_user_texts` строится из самого сценария, то есть сверка частично самореферентна; реальную защиту обеспечивают декларация автора датасета + гейт + review датасета.
+
+### Изоляция сети (L4)
+
+`_no_network` подменяет `socket.connect/connect_ex/create_connection/getaddrinfo`; попытка поднимает `NetworkAccessBlocked`, считается и превращается в нарушение `network_access_attempt`. Работоспособность детектора доказана негативным контролем (локальная попытка `127.0.0.1:9` блокируется и фиксируется; реальное соединение не устанавливается), а уже затем проверено, что Replay даёт 0 попыток и не создаёт `openai.OpenAI`.
+
+### Что именно доказывает Replay (M7)
+
+Три разных утверждения; они не взаимозаменяемы:
+
+| Утверждение | Статус |
+|---|---|
+| Нет сетевых вызовов | **Да** — проверяется изоляцией и негативным контролем |
+| Нет создания LLM-клиента (`OpenAI(...)`) | **Да** — проверяется перехватом конструктора |
+| Нет импорта SDK `openai` | **Нет**. `src/supportops_agent/agent.py` делает `from openai import OpenAI`, поэтому процесс Replay SDK импортирует. Модули `recording.py`/`replay.py` SDK и сетевые библиотеки не импортируют (проверяется AST-тестом) |
+
+Принято как документированное ограничение; production-код ради устранения импорта не менялся.
+
+### Ограничения WP1
+
+* Только синтетические данные. Гейт (email вне `example.com`, телефоны, ключи/Bearer/JWT/DSN/присваивания учётных данных, канарейки, длинные токены) — вторая линия защиты, не доказательство отсутствия ПД.
+* Классификатор не записывается (он использует отдельный контракт `responses.parse`).
+* Любое легитимное изменение агентного поведения (текст контекста, схемы инструментов, вывод инструментов, модель) делает записи несовместимыми — их нужно перезаписать (`--mode synthetic-record`) после осознанного ревью изменения.
+* Live Evaluation и управление бюджетом — следующий этап (EVAL-M02/WP2).

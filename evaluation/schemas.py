@@ -11,7 +11,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 SCHEMA_VERSION = "1"
 
@@ -161,6 +161,9 @@ class Scenario(_Strict):
     id: str = Field(pattern=r"^[a-z]{2,4}-\d{3}$")
     category: Category
     description: str
+    # Явная декларация автора датасета. НЕ доказательство отсутствия ПД: Record Mode
+    # принимает сценарий только при `true`, после чего содержимое всё равно проходит гейт.
+    synthetic: StrictBool | None = None
     ticket: ScenarioTicket
     # None -> классификация отключена (как SupportAgent(classifier=None)).
     classifier: ClassifierScript | None = None

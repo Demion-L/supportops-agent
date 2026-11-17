@@ -1,0 +1,11 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:9488d00ad8d0fea480eae5036f4c00df78ea7a9556ec6bcfc29dc84c0545aeca",
+  "interactions": [],
+  "model": "n-a",
+  "recording_id": "synthetic_cf-003",
+  "scenario_id": "cf-003",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

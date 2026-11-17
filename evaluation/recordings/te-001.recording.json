@@ -1,0 +1,50 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:54ee7da141457cbe63119e7ff33b5c425c00e04ee5a6f48b2be41d4566529f93",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:b3f2b11968245b0b394c6fd58bfcb0e05a75611f241675321dc7273d14a38787",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "order_id": "order_001"
+            },
+            "name": "lookup_order",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:d128cf8a8f7344dfdfcee6dc26e2115dd6d5e2917c8ebc4022ccd8869788c7c4",
+      "response": {
+        "error_type": null,
+        "text": "I could not retrieve the order.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_te-001",
+  "scenario_id": "te-001",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

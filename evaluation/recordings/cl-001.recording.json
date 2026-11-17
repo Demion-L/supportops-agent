@@ -1,0 +1,50 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:f8e4993969d1aff01b19e70344b60fe30dfe87f4c3197d990d686255c83f91cf",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:0b8c5bc4ad622efe0c61dbf1524dba4a1ed24773dad7d16e664698cb2756ca4f",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "customer_id": "customer_001"
+            },
+            "name": "lookup_customer",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:d80ce7ccf5db460af0e896f83a0dabdb5247e25f286c4f5d9bdb1c64314cd8a5",
+      "response": {
+        "error_type": null,
+        "text": "I found your profile.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_cl-001",
+  "scenario_id": "cl-001",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

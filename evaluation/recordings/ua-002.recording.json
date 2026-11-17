@@ -1,0 +1,50 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:22dccc8b0feb20c1925af1d7f27c88453a5c4a5b6a4159c15213fb834fce5683",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:19365de61594939e671ef9db6d1348fb1a076e618af4ca9b3c0ea2d054cece98",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "order_id": "order_001"
+            },
+            "name": "get_order_tracking",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:fa6070e3ba0d7371af41ebd758a7f0a39d82d3612a8a6a5a09d7cdfee7fa3948",
+      "response": {
+        "error_type": null,
+        "text": "I could not find that order.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_ua-002",
+  "scenario_id": "ua-002",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}
