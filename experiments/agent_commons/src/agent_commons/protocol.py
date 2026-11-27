@@ -1,0 +1,26 @@
+"""Коммуникационные интерфейсы. Отделены от реализации Evaluator.
+
+`CommonsPort` — единственное, что видят агенты A и B (Ask/Share/Validate/Feedback).
+`EvaluationSink` — отдельная способность независимого Evaluator; агентам не выдаётся.
+"""
+from __future__ import annotations
+
+from typing import Protocol, Sequence
+
+from .dto import (ApplicationEvidence, AskRequest, AskResponse, FeedbackRequest,
+                  FeedbackResponse, ShareRequest, ShareResponse, ValidateRequest,
+                  ValidateResponse, Verdict)
+
+
+class CommonsPort(Protocol):
+    def ask(self, req: AskRequest) -> AskResponse: ...
+    def share(self, req: ShareRequest) -> ShareResponse: ...
+    def validate(self, req: ValidateRequest) -> ValidateResponse: ...
+    def feedback(self, req: FeedbackRequest) -> FeedbackResponse: ...
+
+
+class EvaluationSink(Protocol):
+    def pending(self) -> Sequence[ApplicationEvidence]: ...
+    def record_observation(self, application_id: str, observation: dict) -> None: ...
+    def record_evaluation(self, application_id: str, verdict: Verdict, quality: int, evaluator_id: str) -> None: ...
+    def assess_rejection(self, application_id: str, verdict: Verdict) -> None: ...
