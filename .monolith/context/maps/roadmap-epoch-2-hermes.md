@@ -64,8 +64,8 @@ authority: authoritative
 | --------------- | ------------- | ------------------ |
 | SUPPORTOPS-SEC-003 | 01 (Security Regression), база для 03 | Код и регрессия в `main`; Story не финализирована в MONOLITH (`active.md` противоречив) |
 | SUPPORTOPS-API-004 | 01 (API-004 Completion), основа 03 | M01/M02 интегрированы в `main` (INTEGRATION-GATE-01); M03/M04 не начаты; `POST /v1/tickets` ждёт решения владельца |
-| SUPPORTOPS-EVAL-001 | 01 (Evaluation Framework Integration), основа 08 | +2 коммита в `eval/supportops-eval-001`, не влиты |
-| SUPPORTOPS-EVAL-002 | 08 (Live Evaluation) | PLANNED; дизайн Live-eval — untracked в worktree eval-001 |
+| SUPPORTOPS-EVAL-001 | 01 (Evaluation Framework Integration), основа 08 | Интегрирован в `main` (`6af9bfb`): deterministic harness + Record & Replay, 27 синтетических сценариев; Evaluation Framework Integration завершена. Метрики синтетические — не оценка реальной LLM |
+| SUPPORTOPS-EVAL-002 | 08 (Live Evaluation) | PLANNED; дизайн сохранён в `docs/evaluation/eval-m02-wp2-live-evaluation-design.md`, **реализация не начата** (перенесена на E2-Phase 08) |
 | SUPPORTOPS-EVAL-003 | 02 (Domain Coupling Analysis) | PLANNED; пересекается с GENESIS — судьбу решает владелец |
 | SUPPORTOPS-ACT-001…004 | 04, 07 (Human Escalation, Human Tasks, Side-Effect Control) | PLANNED; пересмотр scope — решение владельца |
 | SUPPORTOPS-STATE-001/002 | 07 | PLANNED; пересмотр scope после HX-1 |
