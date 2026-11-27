@@ -1,0 +1,59 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:95f09bccd8785e1833532dba6cc76094ffafa480f54ba994b0722b333a1f13a2",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:f2c75d1caf55ee6d62f64794b8fc431f60d9a44ada23ab1dae0775cd04abc05c",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "priority": "normal",
+              "reason": "Delivery delay"
+            },
+            "name": "create_support_case",
+            "raw_arguments": null
+          },
+          {
+            "arguments": {
+              "priority": "normal",
+              "reason": "Delivery delay"
+            },
+            "name": "create_support_case",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:10563cea4ca36473c52d0839857f0135759603cd59ca9d129bbfaf5a0e5e1b0e",
+      "response": {
+        "error_type": null,
+        "text": "Done.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_sc-002",
+  "scenario_id": "sc-002",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

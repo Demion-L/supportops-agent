@@ -1,0 +1,50 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:f2fed8da1f14300bd41021c8c0403c4039502e6a80a2faf77424b40afcb12930",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:ce270f1ebaf2a78a0a9b1e4c7ba391606adef78959858b12a8fb47c88dd66043",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "order_id": "order_005"
+            },
+            "name": "check_refund_eligibility",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:1ef52b182d133b4f5413ddb132ce318ca77976c3edbbe777f5f49a60f264d326",
+      "response": {
+        "error_type": null,
+        "text": "Checked.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_re-003",
+  "scenario_id": "re-003",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

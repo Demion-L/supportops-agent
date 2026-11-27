@@ -1,0 +1,48 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:f5976f4e2c4fa21f2656ab660d6a09122dded80fbe0272b6990ebe0d0bada45d",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:6064774517e985313804f7dc47dee2d970f2f7ac3a1058b29345ab195c77d038",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": null,
+            "name": "lookup_order",
+            "raw_arguments": "{\"order_id\": "
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:972eba043a586dd1662e8a6accdd2be87e3d55f76cc83edb81de87342fa65eb6",
+      "response": {
+        "error_type": null,
+        "text": "Sorry.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_ia-002",
+  "scenario_id": "ia-002",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

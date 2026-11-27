@@ -1,0 +1,50 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:00b2105acb931e39d5af2aa1a271825aaa9819cd01000f5d6ef648c88b44c138",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:b3f2b11968245b0b394c6fd58bfcb0e05a75611f241675321dc7273d14a38787",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "order_id": "order_001"
+            },
+            "name": "lookup_order",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:83d10bf0e99edc6f87cbb7396f3e4d3e6169dfd5468e24802d693ece83d6f2cd",
+      "response": {
+        "error_type": null,
+        "text": "I cannot access that right now.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_mi-001",
+  "scenario_id": "mi-001",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

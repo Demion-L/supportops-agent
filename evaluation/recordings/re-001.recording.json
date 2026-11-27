@@ -1,0 +1,50 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:a9dd3c289b5ff4312e5e92058110ab0209f2643179658eaa497bae480173a33f",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:e5f2d6fbe36e6e7b4d2a633d7d7b1c5c291d09d4bf02ff2c5422d5ec4305ae79",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "order_id": "order_008"
+            },
+            "name": "check_refund_eligibility",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:74ef5c7dcee95e7dc876e096ac03a93561a573614a1fac527d978260385fb081",
+      "response": {
+        "error_type": null,
+        "text": "Your refund is approved and on its way.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_re-001",
+  "scenario_id": "re-001",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

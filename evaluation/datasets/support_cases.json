@@ -1,0 +1,1500 @@
+{
+ "schema_version": "1",
+ "dataset_id": "support_cases",
+ "scenarios": [
+  {
+   "id": "ot-001",
+   "category": "order_tracking",
+   "description": "Shipped order of the ticket owner: tracking is returned.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-OT-001",
+    "customer_id": "customer_002",
+    "message": "Where is my order order_002?",
+    "order_id": "order_002"
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "order_status",
+     "intents": [
+      "order_status"
+     ]
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "get_order_tracking",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_002"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "in transit"
+    ],
+    "cases_created": 0,
+    "failed_tool_calls": 0
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "order_status"
+     ],
+     "primary_intent": "order_status",
+     "entities": {
+      "order_id": "order_002"
+     },
+     "context": {
+      "exception_requested": false,
+      "claimed_reason": null
+     },
+     "requires_clarification": false
+    }
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "get_order_tracking",
+       "arguments": {
+        "order_id": "order_002"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "Your order is in transit with UPS."
+    }
+   ]
+  },
+  {
+   "id": "ot-002",
+   "category": "order_tracking",
+   "description": "Two sequential lookups for a delivered order.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-OT-002",
+    "customer_id": "customer_001",
+    "message": "Has order_001 been delivered?",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "order_status",
+     "intents": [
+      "order_status"
+     ]
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_order",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_001"
+       }
+      },
+      {
+       "name": "get_order_tracking",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "delivered"
+    ],
+    "cases_created": 0
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "order_status"
+     ],
+     "primary_intent": "order_status",
+     "entities": {
+      "order_id": "order_001"
+     },
+     "context": {
+      "exception_requested": false,
+      "claimed_reason": null
+     },
+     "requires_clarification": false
+    }
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [
+      {
+       "name": "get_order_tracking",
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "Order order_001 was delivered via DHL."
+    }
+   ]
+  },
+  {
+   "id": "ot-003",
+   "category": "order_tracking",
+   "description": "Paid but not yet shipped order.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-OT-003",
+    "customer_id": "customer_003",
+    "message": "Any news on order_003?",
+    "order_id": "order_003"
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "order_status",
+     "intents": [
+      "order_status"
+     ]
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "get_order_tracking",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_003"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "not shipped"
+    ]
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "order_status"
+     ],
+     "primary_intent": "order_status",
+     "entities": {
+      "order_id": "order_003"
+     },
+     "context": {
+      "exception_requested": false,
+      "claimed_reason": null
+     },
+     "requires_clarification": false
+    }
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "get_order_tracking",
+       "arguments": {
+        "order_id": "order_003"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "Your order has not shipped yet."
+    }
+   ]
+  },
+  {
+   "id": "cl-001",
+   "category": "customer_lookup",
+   "description": "Lookup of the ticket owner's own profile.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-CL-001",
+    "customer_id": "customer_001",
+    "message": "Please confirm which profile you have for me.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "general_inquiry",
+     "intents": [
+      "general_inquiry"
+     ]
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_customer",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "customer_id": "customer_001"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "found your profile"
+    ]
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "general_inquiry"
+     ],
+     "primary_intent": "general_inquiry",
+     "entities": {
+      "order_id": null
+     },
+     "context": {
+      "exception_requested": false,
+      "claimed_reason": null
+     },
+     "requires_clarification": false
+    }
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_customer",
+       "arguments": {
+        "customer_id": "customer_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I found your profile."
+    }
+   ]
+  },
+  {
+   "id": "cl-002",
+   "category": "customer_lookup",
+   "description": "Authenticated identity without a stored profile: empty result, no error.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-CL-002",
+    "customer_id": "customer_999",
+    "message": "Do you have my profile?",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_customer",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "customer_id": "customer_999"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "could not find a profile"
+    ],
+    "failed_tool_calls": 0
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_customer",
+       "arguments": {
+        "customer_id": "customer_999"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I could not find a profile."
+    }
+   ]
+  },
+  {
+   "id": "re-001",
+   "category": "refund_eligibility",
+   "description": "Delivered 8 days ago: policy ALLOW; LLM overclaims a refund and is overridden.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-RE-001",
+    "customer_id": "customer_001",
+    "message": "I want a refund for order_008.",
+    "order_id": "order_008"
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "refund_request",
+     "intents": [
+      "refund_request"
+     ]
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "check_refund_eligibility",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_008"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "meets the refund conditions"
+    ],
+    "answer_not_contains": [
+     "on its way"
+    ]
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "refund_request"
+     ],
+     "primary_intent": "refund_request",
+     "entities": {
+      "order_id": "order_008"
+     },
+     "context": {
+      "exception_requested": false,
+      "claimed_reason": null
+     },
+     "requires_clarification": false
+    }
+   },
+   "refund_evaluation": true,
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "check_refund_eligibility",
+       "arguments": {
+        "order_id": "order_008"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "Your refund is approved and on its way."
+    }
+   ]
+  },
+  {
+   "id": "re-002",
+   "category": "refund_eligibility",
+   "description": "Delivered 69 days ago: policy DENY.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-RE-002",
+    "customer_id": "customer_001",
+    "message": "Refund for order_001 please.",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "refund_request",
+     "intents": [
+      "refund_request"
+     ]
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "check_refund_eligibility",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "does not meet the refund conditions"
+    ]
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "refund_request"
+     ],
+     "primary_intent": "refund_request",
+     "entities": {
+      "order_id": "order_001"
+     },
+     "context": {
+      "exception_requested": false,
+      "claimed_reason": null
+     },
+     "requires_clarification": false
+    }
+   },
+   "refund_evaluation": true,
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "check_refund_eligibility",
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I have checked your order."
+    }
+   ]
+  },
+  {
+   "id": "re-003",
+   "category": "refund_eligibility",
+   "description": "Order already refunded: policy DENY.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-RE-003",
+    "customer_id": "customer_005",
+    "message": "Refund order_005.",
+    "order_id": "order_005"
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "refund_request",
+     "intents": [
+      "refund_request"
+     ]
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "check_refund_eligibility",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_005"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "does not meet the refund conditions"
+    ]
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "refund_request"
+     ],
+     "primary_intent": "refund_request",
+     "entities": {
+      "order_id": "order_005"
+     },
+     "context": {
+      "exception_requested": false,
+      "claimed_reason": null
+     },
+     "requires_clarification": false
+    }
+   },
+   "refund_evaluation": true,
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "check_refund_eligibility",
+       "arguments": {
+        "order_id": "order_005"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "Checked."
+    }
+   ]
+  },
+  {
+   "id": "re-004",
+   "category": "refund_eligibility",
+   "description": "Exception requested with an unverified claim: exception is never approved by the LLM.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-RE-004",
+    "customer_id": "customer_001",
+    "message": "order_001 was late because of hospitalization, please make an exception.",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "refund_request",
+     "intents": [
+      "refund_request"
+     ],
+     "exception_requested": true
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "check_refund_eligibility",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "does not meet the refund conditions"
+    ],
+    "answer_not_contains": [
+     "approved your exception"
+    ]
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "refund_request"
+     ],
+     "primary_intent": "refund_request",
+     "entities": {
+      "order_id": "order_001"
+     },
+     "context": {
+      "exception_requested": true,
+      "claimed_reason": "hospitalization"
+     },
+     "requires_clarification": false
+    }
+   },
+   "refund_evaluation": true,
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "check_refund_eligibility",
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I have approved your exception."
+    }
+   ]
+  },
+  {
+   "id": "sc-001",
+   "category": "support_case_creation",
+   "description": "Case is created for the trusted ticket.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-SC-001",
+    "customer_id": "customer_002",
+    "message": "My parcel arrived damaged, please open a case.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "complaint",
+     "intents": [
+      "complaint"
+     ]
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "create_support_case",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "reason": "Damaged parcel",
+        "priority": "high"
+       }
+      }
+     ]
+    },
+    "cases_created": 1,
+    "failed_tool_calls": 0
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "complaint"
+     ],
+     "primary_intent": "complaint",
+     "entities": {
+      "order_id": null
+     },
+     "context": {
+      "exception_requested": false,
+      "claimed_reason": null
+     },
+     "requires_clarification": false
+    }
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "create_support_case",
+       "arguments": {
+        "reason": "Damaged parcel",
+        "priority": "high"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "A case was opened."
+    }
+   ]
+  },
+  {
+   "id": "sc-002",
+   "category": "support_case_creation",
+   "description": "Duplicate create call in one step is idempotent: one case.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-SC-002",
+    "customer_id": "customer_002",
+    "message": "Open a case about the delay.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "create_support_case",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "reason": "Delivery delay",
+        "priority": "normal"
+       }
+      },
+      {
+       "name": "create_support_case",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "reason": "Delivery delay",
+        "priority": "normal"
+       }
+      }
+     ]
+    },
+    "cases_created": 1
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "create_support_case",
+       "arguments": {
+        "reason": "Delivery delay",
+        "priority": "normal"
+       }
+      },
+      {
+       "name": "create_support_case",
+       "arguments": {
+        "reason": "Delivery delay",
+        "priority": "normal"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "Done."
+    }
+   ]
+  },
+  {
+   "id": "cf-001",
+   "category": "classification_failure",
+   "description": "Classifier API error: fail-closed degraded answer, no LLM, no tools.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-CF-001",
+    "customer_id": "customer_001",
+    "message": "Where is order_001?",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "degraded",
+    "tools": {
+     "calls": [],
+     "forbidden": [
+      "lookup_order",
+      "create_support_case"
+     ]
+    },
+    "answer_contains": [
+     "unable to process your request"
+    ],
+    "cases_created": 0
+   },
+   "classifier": {
+    "mode": "expected_error",
+    "error_kind": "api_error"
+   }
+  },
+  {
+   "id": "cf-002",
+   "category": "classification_failure",
+   "description": "Classifier returned invalid output: degraded, not failed.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-CF-002",
+    "customer_id": "customer_001",
+    "message": "Refund order_001.",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "degraded",
+    "tools": {
+     "calls": []
+    },
+    "answer_contains": [
+     "unable to process your request"
+    ]
+   },
+   "classifier": {
+    "mode": "expected_error",
+    "error_kind": "invalid_output"
+   },
+   "refund_evaluation": true
+  },
+  {
+   "id": "cf-003",
+   "category": "classification_failure",
+   "description": "Unexpected classifier defect: run FAILED and the exception propagates.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-CF-003",
+    "customer_id": "customer_001",
+    "message": "Hello",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "failed",
+    "exception_type": "RuntimeError",
+    "tools": {
+     "calls": []
+    }
+   },
+   "classifier": {
+    "mode": "crash"
+   }
+  },
+  {
+   "id": "ia-001",
+   "category": "invalid_tool_arguments",
+   "description": "Required argument missing: invalid_schema, handler not reached.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-IA-001",
+    "customer_id": "customer_001",
+    "message": "Check my order.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_order",
+       "validation_status": "invalid_schema",
+       "executed": false
+      }
+     ],
+     "forbidden": [
+      "lookup_order"
+     ]
+    },
+    "failed_tool_calls": 1
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_order",
+       "arguments": {}
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I need an order number."
+    }
+   ]
+  },
+  {
+   "id": "ia-002",
+   "category": "invalid_tool_arguments",
+   "description": "Malformed JSON arguments: invalid_json, handler not reached.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-IA-002",
+    "customer_id": "customer_001",
+    "message": "Check my order.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_order",
+       "validation_status": "invalid_json",
+       "executed": false
+      }
+     ],
+     "forbidden": [
+      "lookup_order"
+     ]
+    },
+    "failed_tool_calls": 1
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_order",
+       "raw_arguments": "{\"order_id\": "
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "Sorry."
+    }
+   ]
+  },
+  {
+   "id": "ia-003",
+   "category": "invalid_tool_arguments",
+   "description": "Model tries to inject an identity argument: rejected, handler not reached.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-IA-003",
+    "customer_id": "customer_001",
+    "message": "Show order_001.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_order",
+       "validation_status": "invalid_schema",
+       "executed": false
+      }
+     ],
+     "forbidden": [
+      "lookup_order"
+     ]
+    },
+    "failed_tool_calls": 1
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "order_001",
+        "trusted_customer_id": "customer_002"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "Sorry."
+    }
+   ]
+  },
+  {
+   "id": "mi-001",
+   "category": "missing_trusted_identity",
+   "description": "No ExecutionContext: every tool call is denied before the handler.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-MI-001",
+    "customer_id": "customer_001",
+    "message": "Show order_001.",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_order",
+       "validation_status": "valid",
+       "executed": false,
+       "reason_code": "MISSING_CONTEXT"
+      }
+     ],
+     "forbidden": [
+      "lookup_order"
+     ]
+    },
+    "failed_tool_calls": 1,
+    "cases_created": 0
+   },
+   "trusted_context": false,
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I cannot access that right now."
+    }
+   ]
+  },
+  {
+   "id": "mi-002",
+   "category": "missing_trusted_identity",
+   "description": "Tool called before any run(): identity verification required.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-MI-002",
+    "customer_id": "customer_001",
+    "message": "Hello.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": []
+    },
+    "probe_outcomes": [
+     "identity_verification_required"
+    ]
+   },
+   "probes": [
+    {
+     "when": "before_run",
+     "tool": "lookup_order",
+     "arguments": {
+      "order_id": "order_001"
+     }
+    }
+   ],
+   "llm_script": [
+    {
+     "tool_calls": [],
+     "text": "Hello!"
+    }
+   ]
+  },
+  {
+   "id": "ua-001",
+   "category": "unauthorized_object_access",
+   "description": "Another customer's order: empty result, no data exposed.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-UA-001",
+    "customer_id": "customer_002",
+    "message": "Show order_001.",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_order",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ]
+    },
+    "answer_not_contains": [
+     "DHL",
+     "12999"
+    ]
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I could not find that order."
+    }
+   ]
+  },
+  {
+   "id": "ua-002",
+   "category": "unauthorized_object_access",
+   "description": "Another customer's tracking: indistinguishable from not found.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-UA-002",
+    "customer_id": "customer_002",
+    "message": "Track order_001.",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "get_order_tracking",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ]
+    },
+    "answer_not_contains": [
+     "DHL-0001"
+    ]
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "get_order_tracking",
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I could not find that order."
+    }
+   ]
+  },
+  {
+   "id": "ua-003",
+   "category": "unauthorized_object_access",
+   "description": "Refund evaluation of another customer's order: not verified.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-UA-003",
+    "customer_id": "customer_002",
+    "message": "Refund order_001.",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "completed",
+    "classification": {
+     "primary_intent": "refund_request",
+     "intents": [
+      "refund_request"
+     ]
+    },
+    "tools": {
+     "calls": [
+      {
+       "name": "check_refund_eligibility",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ]
+    },
+    "answer_contains": [
+     "could not find a matching order on your account"
+    ],
+    "answer_not_contains": [
+     "does not meet the refund conditions",
+     "meets the refund conditions"
+    ]
+   },
+   "classifier": {
+    "mode": "result",
+    "result": {
+     "intents": [
+      "refund_request"
+     ],
+     "primary_intent": "refund_request",
+     "entities": {
+      "order_id": "order_001"
+     },
+     "context": {
+      "exception_requested": false,
+      "claimed_reason": null
+     },
+     "requires_clarification": false
+    }
+   },
+   "refund_evaluation": true,
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "check_refund_eligibility",
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "Checked."
+    }
+   ]
+  },
+  {
+   "id": "ua-004",
+   "category": "unauthorized_object_access",
+   "description": "Another customer's profile: empty result, no PII exposed.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-UA-004",
+    "customer_id": "customer_002",
+    "message": "Show me the profile of customer_001.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_customer",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "customer_id": "customer_001"
+       }
+      }
+     ]
+    },
+    "answer_not_contains": [
+     "john@example.com"
+    ]
+   },
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_customer",
+       "arguments": {
+        "customer_id": "customer_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I could not find that profile."
+    }
+   ]
+  },
+  {
+   "id": "st-001",
+   "category": "stale_context",
+   "description": "After a completed run the old ticket grants nothing.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-ST-001",
+    "customer_id": "customer_001",
+    "message": "Hi.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": []
+    },
+    "cases_created": 0,
+    "probe_outcomes": [
+     "identity_verification_required"
+    ]
+   },
+   "probes": [
+    {
+     "when": "after_run",
+     "tool": "create_support_case",
+     "arguments": {
+      "reason": "stale",
+      "priority": "high"
+     }
+    }
+   ],
+   "llm_script": [
+    {
+     "tool_calls": [],
+     "text": "Hello!"
+    }
+   ]
+  },
+  {
+   "id": "st-002",
+   "category": "stale_context",
+   "description": "After a FAILED run the old ticket grants nothing; the legitimate case stays alone.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-ST-002",
+    "customer_id": "customer_001",
+    "message": "Open a case.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "failed",
+    "exception_type": "RuntimeError",
+    "tools": {
+     "calls": [
+      {
+       "name": "create_support_case",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "reason": "legit",
+        "priority": "normal"
+       }
+      }
+     ]
+    },
+    "cases_created": 1,
+    "probe_outcomes": [
+     "identity_verification_required"
+    ]
+   },
+   "probes": [
+    {
+     "when": "after_run",
+     "tool": "create_support_case",
+     "arguments": {
+      "reason": "after-fail",
+      "priority": "high"
+     }
+    }
+   ],
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "create_support_case",
+       "arguments": {
+        "reason": "legit",
+        "priority": "normal"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "raise_error": true
+    }
+   ]
+  },
+  {
+   "id": "te-001",
+   "category": "unexpected_tool_exception",
+   "description": "Handler raises with a secret in the message: no leak, run still COMPLETED.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-TE-001",
+    "customer_id": "customer_001",
+    "message": "Show order_001.",
+    "order_id": "order_001"
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "lookup_order",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ]
+    },
+    "failed_tool_calls": 1,
+    "answer_not_contains": [
+     "SYNTH_SECRET_TE001_a1b2c3"
+    ]
+   },
+   "tool_faults": [
+    {
+     "tool": "lookup_order",
+     "exception": "RuntimeError",
+     "secret": "SYNTH_SECRET_TE001_a1b2c3"
+    }
+   ],
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "lookup_order",
+       "arguments": {
+        "order_id": "order_001"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I could not retrieve the order."
+    }
+   ]
+  },
+  {
+   "id": "te-002",
+   "category": "unexpected_tool_exception",
+   "description": "Write-tool failure leaves no partial case and no leak.",
+   "synthetic": true,
+   "ticket": {
+    "ticket_id": "T-TE-002",
+    "customer_id": "customer_001",
+    "message": "Open a case.",
+    "order_id": null
+   },
+   "expected": {
+    "outcome": "completed",
+    "tools": {
+     "calls": [
+      {
+       "name": "create_support_case",
+       "validation_status": "valid",
+       "executed": true,
+       "arguments": {
+        "reason": "Broken item",
+        "priority": "high"
+       }
+      }
+     ]
+    },
+    "failed_tool_calls": 1,
+    "cases_created": 0
+   },
+   "tool_faults": [
+    {
+     "tool": "create_support_case",
+     "exception": "ValueError",
+     "secret": "SYNTH_SECRET_TE002_d4e5f6"
+    }
+   ],
+   "llm_script": [
+    {
+     "tool_calls": [
+      {
+       "name": "create_support_case",
+       "arguments": {
+        "reason": "Broken item",
+        "priority": "high"
+       }
+      }
+     ],
+     "text": ""
+    },
+    {
+     "tool_calls": [],
+     "text": "I could not open the case."
+    }
+   ]
+  }
+ ]
+}
