@@ -43,6 +43,24 @@ _FIXED: Final[dict[int, tuple[str, str]]] = {
     500: ("internal_error", "Internal server error."),
     503: ("service_unavailable", "Service temporarily unavailable."),
 }
+# Request-shape rejections raised by route handlers. Codes are a closed set; text is fixed.
+_REJECTIONS: Final[dict[int, tuple[str, str]]] = {
+    400: ("idempotency_key_required", "A valid Idempotency-Key header is required."),
+    413: _FIXED[413],
+    415: ("unsupported_media_type", "Content-Type must be application/json."),
+}
+
+
+class RequestRejected(Exception):
+    """A request rejected before the operation. Only the status is carried; the body is fixed."""
+
+    def __init__(self, status: int) -> None:
+        if status not in _REJECTIONS:
+            raise ValueError("unsupported rejection status")
+        super().__init__("Request rejected.")
+        self.status = status
+
+
 _GENERIC_4XX: Final = ("client_error", "The request could not be processed.")
 _GENERIC_5XX: Final = _FIXED[500]
 
@@ -105,6 +123,12 @@ async def _validation_handler(request: Request, exc: Exception) -> JSONResponse:
     return _response(422, code, message, request, {"fields": fields})
 
 
+async def _rejection_handler(request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, RequestRejected)
+    code, message = _REJECTIONS[exc.status]
+    return _response(exc.status, code, message, request)
+
+
 async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
     # Server-side log carries only the exception class, never its message or traceback text.
     logger.error("unhandled_exception type=%s", type(exc).__name__)
@@ -132,6 +156,7 @@ async def _storage_failure_handler(request: Request, exc: Exception) -> JSONResp
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(RequestRejected, _rejection_handler)
     app.add_exception_handler(StorageUnavailable, _storage_unavailable_handler)
     app.add_exception_handler(IdempotencyConflict, _idempotency_conflict_handler)
     app.add_exception_handler(StorageFailure, _storage_failure_handler)
