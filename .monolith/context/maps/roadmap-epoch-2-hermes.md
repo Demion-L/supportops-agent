@@ -22,8 +22,8 @@ authority: authoritative
 
 | Фаза | Название | Статус | Примечание |
 | ---- | -------- | ------ | ---------- |
-| 00 | Genesis | DONE (документы не закоммичены) | Идентичность, исследование, независимое ревью, Epoch II Roadmap. Hygiene — частично (см. Phase 01) |
-| 01 | Engineering Consolidation | IN PROGRESS | Единая проверенная baseline. Критерии: директива §VII |
+| 00 | Genesis | DONE (документы закоммичены: `f60350a`) | Идентичность, исследование, независимое ревью, Epoch II Roadmap. Hygiene — частично (см. Phase 01) |
+| 01 | Engineering Consolidation | ENGINEERING BASELINE COMPLETE (2026-11-27) | `main` @ `030c45d`: 1364 passed, 0 skipped на PostgreSQL 16; API-004 HTTP slice и EVAL-001 интегрированы. Открыто: сверка MIS-0005 (не блокер) |
 | 02 | Modular Execution Core | PLANNED | Начинать только после Phase 01; гейт — HX-1 (решение владельца) |
 | 03 | Multi-Tenant Orchestration | PLANNED | |
 | 04 | AI Dispatcher | PLANNED | |
@@ -63,7 +63,7 @@ authority: authoritative
 | Story (Epoch I) | Epoch II фаза | Фактический статус |
 | --------------- | ------------- | ------------------ |
 | SUPPORTOPS-SEC-003 | 01 (Security Regression), база для 03 | Код и регрессия в `main`; Story не финализирована в MONOLITH (`active.md` противоречив) |
-| SUPPORTOPS-API-004 | 01 (API-004 Completion), основа 03 | M01/M02 интегрированы в `main` (INTEGRATION-GATE-01); M03/M04 не начаты; `POST /v1/tickets` ждёт решения владельца |
+| SUPPORTOPS-API-004 | 01 (API-004 Completion), основа 03 | M01/M02 (INTEGRATION-GATE-01) и HTTP slice `POST/GET /v1/tickets` (`030c45d`, security contract ред. 4, tenant-asserted customer identity) интегрированы в `main`; M03 (интеграция SupportAgent) не начата |
 | SUPPORTOPS-EVAL-001 | 01 (Evaluation Framework Integration), основа 08 | Интегрирован в `main` (`6af9bfb`): deterministic harness + Record & Replay, 27 синтетических сценариев; Evaluation Framework Integration завершена. Метрики синтетические — не оценка реальной LLM |
 | SUPPORTOPS-EVAL-002 | 08 (Live Evaluation) | PLANNED; дизайн сохранён в `docs/evaluation/eval-m02-wp2-live-evaluation-design.md`, **реализация не начата** (перенесена на E2-Phase 08) |
 | SUPPORTOPS-EVAL-003 | 02 (Domain Coupling Analysis) | PLANNED; пересекается с GENESIS — судьбу решает владелец |
@@ -78,7 +78,7 @@ authority: authoritative
 
 - Phase 02 ← Phase 01 (baseline) ← решение владельца по HX-1.
 - API-004 M03 (SupportAgent integration) ← SEC-003 в `main` (выполнено) ← решение о доверенном источнике `customer_id`.
-- EVAL-001 integration ← разрешение владельца на merge (в директиве merge запрещён без отдельного разрешения).
+- EVAL-001 integration — выполнено (`6af9bfb`).
 - Phase 03 ← Phase 02 (Parameterized Runtime, Capability Contracts).
 - Phase 04 ← Phase 02 + 03; Phase 05 ← 02 + channel trust model; Phase 07 ← швы запуска из 02.
 

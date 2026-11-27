@@ -59,5 +59,5 @@ finalization capsule, `state.json` (MIS-0004 completed) and Git (`78af152` is an
 
 ## Epoch II (2026-11-27)
 
-HERMES Epoch II начата; Phase 01 — Engineering Consolidation в работе. Roadmap: `context/maps/roadmap-epoch-2-hermes.md`.
+HERMES Epoch II начата; Phase 01 — Engineering Consolidation: инженерная baseline завершена (`main` @ `030c45d`, 1364 passed на PG 16; API-004 HTTP slice и EVAL-001 интегрированы), открыта сверка MIS-0005. Roadmap: `context/maps/roadmap-epoch-2-hermes.md`.
 Невыполнимые governance-операции: `docs/hermes/governance-reconciliation-2026-11-27.md` (G3 — статус SEC-003 — устранён 2026-11-27).

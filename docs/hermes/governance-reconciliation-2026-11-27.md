@@ -16,7 +16,7 @@
 | G1 | Расхождение Tactical Coordinatorium между worktree | `state.json` в gitignore и живёт отдельно в каждом worktree. `main`: revision 31, 4 миссии (MIS-0001…0004, все completed), 23 checkpoint. `supportops-agent-api004-m01`: revision 33, **5 миссий (MIS-0005 `in_progress`)**, 24 checkpoint | Сверка владельцем штатными средствами. Ручное копирование запрещено директивой |
 | G2 | Удаление worktree `supportops-agent-api004-m01` | Ветка полностью влита (HEAD — предок `main`), чистый tree, **но** в его ignored `state.json` лежит единственная копия MIS-0005 и 1 checkpoint. Удаление уничтожило бы запись | Сначала разрешить G1 |
 | G3 | Финализация SEC-003 | `active.md` противоречив: «No active story recorded» и одновременно «Active story: SUPPORTOPS-SEC-003… in progress»; roadmap-index показывает SEC-003 ACTIVE; в `state.json` MIS-0004 completed | Штатный skill `finalize-story` по решению владельца |
-| G4 | Статус API-004 в MONOLITH | В `roadmap-index.md` API-004 = PLANNED, фактически M01/M02 интегрированы в `main` | Обновление владельцем/через finalize |
+| G4 (устранено 2026-11-27) | Статус API-004 в MONOLITH | `roadmap-index.md` обновлён: IN PROGRESS; M01/M02 и HTTP slice интегрированы в `main` | Обновление владельцем/через finalize |
 | G5 | Missions для Phase 01 | Директива: не регистрировать Missions для работ, которые не начались; работы Phase 01 без commit-разрешения ограничены проверками | Регистрировать при старте реализации в отдельных worktree |
 
 ## Прочие находки аудита
