@@ -1,0 +1,73 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:5224f62cf1921bfa711004cc6a7f9b79bc662d48aa88ccbe8cf609ede57d8efc",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:94033b08a87e0a2b48ad5ab01a1dcefc1f47f68eaf51b4083dd9cca3fa6b721a",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "order_id": "order_001"
+            },
+            "name": "lookup_order",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:0642cd44c8718848db28cdd74c698039cb231dc68bb7188a298694e7bcc4bcc0",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "order_id": "order_001"
+            },
+            "name": "get_order_tracking",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    },
+    {
+      "request_fingerprint": "sha256:3df52ef8b5a1b8cdc85e9b023757cba1e36742311115425b3b23af2cff738de9",
+      "response": {
+        "error_type": null,
+        "text": "Order order_001 was delivered via DHL.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 3
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_ot-002",
+  "scenario_id": "ot-002",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

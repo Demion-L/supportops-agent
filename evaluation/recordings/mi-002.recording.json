@@ -1,0 +1,27 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:5d1da0ce41630d7dc68a9cb1ef23b89997adda02fea7951b5550713595a8c00a",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:d1eb0f39cdfad2111290a1e333fc619e13efa4c0c0ed2e02f27108239839d974",
+      "response": {
+        "error_type": null,
+        "text": "Hello!",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_mi-002",
+  "scenario_id": "mi-002",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

@@ -1,0 +1,50 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:b190d27c7660a875fe66299f76c1692d2891917e5b490929b767edeb82385bd2",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:9b3ae243d12e843904b8e1882d3a10df3df9215491b9c94756aa6e5c78dc102c",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "order_id": "order_002"
+            },
+            "name": "get_order_tracking",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:d2a9da5e06a7fbfe43a03c97e9ab0d2ac64eb987eabd1b8783e2408b847f1521",
+      "response": {
+        "error_type": null,
+        "text": "Your order is in transit with UPS.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_ot-001",
+  "scenario_id": "ot-001",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

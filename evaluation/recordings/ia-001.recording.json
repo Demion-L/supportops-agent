@@ -1,0 +1,48 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:ca111de08c9f0e8e4a640bada1eacabefdc06cf6660288e7decc1dd3854145c3",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:6064774517e985313804f7dc47dee2d970f2f7ac3a1058b29345ab195c77d038",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {},
+            "name": "lookup_order",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:972eba043a586dd1662e8a6accdd2be87e3d55f76cc83edb81de87342fa65eb6",
+      "response": {
+        "error_type": null,
+        "text": "I need an order number.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_ia-001",
+  "scenario_id": "ia-001",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}

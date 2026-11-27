@@ -1,0 +1,51 @@
+{
+  "data_class": "synthetic",
+  "integrity": "sha256:796293f4e6e54107a3cbce4d3da8700a334b25ae431d56b0b8e54c6f6d3d2c04",
+  "interactions": [
+    {
+      "request_fingerprint": "sha256:b3f2b11968245b0b394c6fd58bfcb0e05a75611f241675321dc7273d14a38787",
+      "response": {
+        "error_type": null,
+        "text": "",
+        "tool_calls": [
+          {
+            "arguments": {
+              "order_id": "order_001",
+              "trusted_customer_id": "customer_002"
+            },
+            "name": "lookup_order",
+            "raw_arguments": null
+          }
+        ],
+        "type": "tool_calls",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 1
+    },
+    {
+      "request_fingerprint": "sha256:972eba043a586dd1662e8a6accdd2be87e3d55f76cc83edb81de87342fa65eb6",
+      "response": {
+        "error_type": null,
+        "text": "Sorry.",
+        "tool_calls": [],
+        "type": "text",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 5,
+          "total_tokens": 15
+        }
+      },
+      "sequence": 2
+    }
+  ],
+  "model": "gpt-4.1-mini",
+  "recording_id": "synthetic_ia-003",
+  "scenario_id": "ia-003",
+  "schema_version": 1,
+  "source": "synthetic_fake_upstream",
+  "status": "complete"
+}
