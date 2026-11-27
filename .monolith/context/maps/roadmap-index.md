@@ -13,6 +13,10 @@ goals, criteria and status.** Evidence for Phases 1–3 is in `context/retrospec
 
 The seven-phase structure is the owner's; do not change count or order without agreement.
 
+
+> **Epoch II (2026-11-27):** проект получил идентичность HERMES. Roadmap Epoch II (Phases 00–10) —
+> [roadmap-epoch-2-hermes.md](roadmap-epoch-2-hermes.md). Phases 1–7 выше — история Epoch I (SupportOps), без изменений.
+
 ---
 
 ## Phases
@@ -45,8 +49,8 @@ The seven-phase structure is the owner's; do not change count or order without a
   customer/order tools; classification and response failures fail closed; security regression tests.
 - Evidence: [phase-3](../retrospective/phase-3-safety-and-policy.md). Historical (non-native) items:
   Classification, AUTH-001/002 (committed earlier), POLICY-001/002/003 (uncommitted at Historical Bootstrap; later committed within the combined checkpoint commit `b5f866c`, together with Classification, Authorization and Refund Policy — not as separate per-task commits).
-- Active story: `SUPPORTOPS-SEC-003` — **activated**, not finalized
-  ([scope](../planned/SUPPORTOPS-SEC-003.md)).
+- Story `SUPPORTOPS-SEC-003` — **COMPLETED 2026-11-15** (finalization capsule in `memory/working/phases/phase-3/stories/`;
+  corrected 2026-11-27) ([scope](../planned/SUPPORTOPS-SEC-003.md)).
 - Limitations: ownership only for refund evaluation; classification failure degrades open.
 
 ### Phase 4 — Actions & Escalation
@@ -91,7 +95,7 @@ inside each document, not records in MONOLITH. Phase statuses above are unchange
 
 | Phase | Story | Title | Status | Proposed Missions |
 | ----- | ----- | ----- | ------ | ----------------- |
-| 3 | [SUPPORTOPS-SEC-003](../planned/SUPPORTOPS-SEC-003.md) | Object-Level Authorization & Response Fail-Closed | ACTIVE (not finalized) | 4 |
+| 3 | [SUPPORTOPS-SEC-003](../planned/SUPPORTOPS-SEC-003.md) | Object-Level Authorization & Response Fail-Closed | COMPLETED 2026-11-15 | 4 |
 | 3 | [SUPPORTOPS-SEC-004](../planned/SUPPORTOPS-SEC-004.md) | Security Evaluation & Policy Boundary Hardening | PLANNED | 4 |
 | 4 | [SUPPORTOPS-ACT-001](../planned/SUPPORTOPS-ACT-001.md) | Ticket Lifecycle & Decision Model | PLANNED | 4 |
 | 4 | [SUPPORTOPS-ACT-002](../planned/SUPPORTOPS-ACT-002.md) | Human Escalation Workflow | PLANNED | 4 |
@@ -116,7 +120,7 @@ record, with a short explanatory note.
 ## Current Focus
 
 Active Phase: Phase 3 — Safety & Policy
-Active Story: SUPPORTOPS-SEC-003 (activated; not finalized)
+Active Story: none recorded (SUPPORTOPS-SEC-003 COMPLETED 2026-11-15; Epoch II: see `roadmap-epoch-2-hermes.md`)
 
 ---
 
