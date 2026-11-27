@@ -1,41 +1,61 @@
-# SupportOps Agent
+# HERMES
 
-SupportOps Agent is the first operational domain of a broader agentic command platform for coordinating enterprise workflows, tools, services, and human decisions.
+**Modular Multi-Tenant Business Orchestration Platform**
 
-The project begins with a focused customer-support agent capable of investigating requests, calling business tools, applying operational policies, and escalating cases when human judgment is required.
+*One orchestrator. Multiple capabilities. Infinite business configurations.*
 
-## Current Scope
+> Latysh Development · Epoch II: Genesis · 27 ноября 2026
+> Историческое название первой эпохи и первого предметного домена — **SupportOps Agent**.
 
-The initial implementation focuses on support operations:
+---
 
-* ticket classification;
-* customer and order investigation;
-* policy-aware decision-making;
-* tool calling;
-* human escalation;
-* execution tracking;
-* behavior evaluation.
+## Что такое HERMES
 
-## Platform Foundation
+HERMES — проект модульной мультитенантной платформы, которая должна исполнять индивидуальные наборы бизнес-возможностей (инструменты, интеграции, политики, знания, workflow, специализированные ИИ-агенты, задачи для человека) для разных организаций, не позволяя ни одному модулю получить полномочия только из-за решения LLM.
 
-The system is being built around:
+HERMES **не создан с нуля**. Он наследует весь инженерный фундамент SupportOps Agent: код, историю Git, security contracts, тесты, persistence, документацию и незавершённые направления. Название и предназначение утверждены владельцем; **конкретная архитектура ещё не утверждена** и исследуется (см. `docs/hermes/`).
 
-* FastAPI for application-facing APIs;
-* MCP for AI-native capability access;
-* LangGraph for stateful workflow orchestration;
-* an agent runtime for execution management;
-* an evaluation harness for measurable behavioral quality.
+## Статус (честно)
 
-## Long-Term Direction
+| Что | Состояние |
+|---|---|
+| Имя и предназначение | Утверждено владельцем 2026-11-27 |
+| Предметный домен | Единственный реализованный — **SupportOps** (клиентская поддержка, заказы, возвраты) |
+| Агентное ядро | Рабочее, жёстко защищённое, но однодоменное и однотенантное (в ядре нет понятия tenant) |
+| Сервисный слой | API-скелет, аутентификация по API-ключам, tenant из credential, PostgreSQL, репозиторий тикетов |
+| Оркестрация модулей | **Не реализована.** Это гипотеза, а не возможность |
+| Готовность к production | Не заявляется |
 
-The long-term direction is an AI-native operations control plane capable of coordinating multiple business domains across a large organization.
+Гипотеза «SupportOps — фундамент оркестратора» **подтверждена частично**; границы подтверждённого и неподтверждённого — в `docs/hermes/FINAL-REPORT.md`.
 
-Support operations is the starting point. The same architectural foundation can later support finance, sales, compliance, logistics, internal operations, and executive decision workflows while preserving human oversight, policy enforcement, traceability, and measurable execution quality.
+## Навигация по документам эпохи II
 
-## Status
+| Документ | Содержание |
+|---|---|
+| [`docs/hermes/FINAL-REPORT.md`](docs/hermes/FINAL-REPORT.md) | Итоговый отчёт (27 разделов), начинать отсюда |
+| [`docs/hermes/00-owner-decision-2026-11-27.md`](docs/hermes/00-owner-decision-2026-11-27.md) | Запись решения владельца |
+| [`docs/hermes/01-identity-and-genesis.md`](docs/hermes/01-identity-and-genesis.md) | Идентичность, миссия, видение, переход SupportOps → HERMES |
+| [`docs/hermes/02-architecture-inventory.md`](docs/hermes/02-architecture-inventory.md) | Подтверждённая карта архитектуры + матрица переиспользования (A–E) |
+| [`docs/hermes/03-modular-orchestration-research.md`](docs/hermes/03-modular-orchestration-research.md) | Capability-модули, мультитенантная композиция, оркестрация, каналы, outcome-метрики |
+| [`docs/hermes/04-alternatives-and-commercial-validation.md`](docs/hermes/04-alternatives-and-commercial-validation.md) | Альтернативы, кандидаты A–D, минимальный эксперимент, демо AI Dispatcher |
+| [`docs/hermes/05-stc-and-ecosystem.md`](docs/hermes/05-stc-and-ecosystem.md) | Совместимость с STC, границы экосистемы Latysh Development |
+| [`docs/hermes/06-technical-identity-migration-plan.md`](docs/hermes/06-technical-identity-migration-plan.md) | План безопасного технического переименования |
+| [`docs/hermes/07-engineering-continuity.md`](docs/hermes/07-engineering-continuity.md) | Влияние на текущие направления разработки |
+| [`docs/hermes/08-independent-architecture-review.md`](docs/hermes/08-independent-architecture-review.md) | Независимое ревью (способное опровергнуть гипотезу) |
+| [`docs/hermes/09-epoch-ii-roadmap.md`](docs/hermes/09-epoch-ii-roadmap.md) | Epoch II Roadmap: фазы E2-Phase 00–10 |
+| [`docs/hermes/10-post-genesis-state.md`](docs/hermes/10-post-genesis-state.md) | Актуальное состояние после Genesis: worktree, security contract, архив эксперимента |
 
-Early development.
+Документы Epoch I (`docs/design/`, `docs/security/`, `.monolith/context/`) сохранены без изменений и остаются историческим источником истины для эпохи SupportOps.
 
+## Технические идентификаторы (намеренно не менялись)
+
+Python-пакеты `supportops_agent` и `supportops_service`, префикс переменных окружения `SUPPORTOPS_`, имена таблиц, ветки Git, имя удалённого репозитория — **остаются прежними**. Их миграция — отдельное решение владельца (`docs/hermes/06-technical-identity-migration-plan.md`).
+
+## Экосистема Latysh Development
+
+HERMES — один из самостоятельных проектов: MONOLITH (процесс разработки, не runtime-зависимость), SPHYNX, STC, KAIROS, AGORA, FEMIDA, SYMPOSIUM. Никакой общий runtime и никакие межпроектные зависимости не вводятся без отдельного решения владельца.
+
+---
 
 И не забудь: при новом открытии терминала активировать окружение:
 
