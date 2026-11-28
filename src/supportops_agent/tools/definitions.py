@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, Field
 
 from supportops_agent.models import CasePriority
-from supportops_agent.refund_evaluation import check_refund_eligibility
-from supportops_agent.tools import (
+from supportops_agent.business.refund_evaluation import check_refund_eligibility
+from supportops_agent.business.support_tools import (
     create_support_case,
     get_order_tracking,
     lookup_customer,

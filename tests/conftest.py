@@ -1,6 +1,6 @@
 import pytest
 
-from supportops_agent import mock_data
+from supportops_agent.business import mock_data
 
 
 @pytest.fixture(autouse=True)

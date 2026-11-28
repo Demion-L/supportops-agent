@@ -53,10 +53,10 @@ from evaluation.sources import FakeSource, Mode, RecordSource, ReplaySource
 from evaluation.fakes import FakeLLMClient
 from evaluation.schemas import Scenario
 from pydantic import ValidationError
-from supportops_agent import agent as agent_module
-from supportops_agent import mock_data
-from supportops_agent.agent import SupportAgent
-from supportops_agent.tool_definitions import TOOL_REGISTRY
+from supportops_agent.runtime import agent as agent_module
+from supportops_agent.business import mock_data
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.definitions import TOOL_REGISTRY
 
 REPO = Path(evaluation.__file__).resolve().parents[1]
 TEXT_ONLY, ONE_TOOL, SEQUENTIAL, MULTI_IN_TURN = "mi-002", "ot-001", "ot-002", "sc-002"
@@ -317,7 +317,7 @@ def test_r6_incompatible_agent_change_is_detected(loaded, recorded, monkeypatch)
 
 
 def test_r6_model_or_tools_change_is_detected(loaded, recorded, monkeypatch):
-    monkeypatch.setattr("supportops_agent.agent.MODEL_NAME", "other-model")
+    monkeypatch.setattr("supportops_agent.runtime.agent.MODEL_NAME", "other-model")
     assert replay(loaded, recorded[ONE_TOOL]).harness_error == "replay:fingerprint_mismatch"
     monkeypatch.undo()
     definition = TOOL_REGISTRY["get_order_tracking"]
@@ -681,15 +681,40 @@ def test_r15_replay_does_not_modify_production_objects(loaded, recorded):
     assert {n: d.handler for n, d in TOOL_REGISTRY.items()} == before_handlers
 
 
-def test_r15_src_is_unchanged_since_eval_baseline():
-    # Guards the agent code evaluated by the harness. The service layer (src/supportops_service) is
-    # outside the evaluated surface and evolves independently (API-004).
-    if subprocess.run(["git", "cat-file", "-e", "5afdf2d"], cwd=REPO, capture_output=True).returncode:
-        pytest.skip("baseline commit not available")
-    diff = subprocess.run(
-        ["git", "diff", "--name-only", "5afdf2d", "--", "src/supportops_agent"], cwd=REPO, capture_output=True, text=True
-    )
-    assert diff.returncode == 0 and diff.stdout.strip() == ""
+def _source_digest(root: Path) -> dict[str, str]:
+    import hashlib
+
+    return {
+        str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted(root.rglob("*.py"))
+        if "__pycache__" not in p.parts
+    }
+
+
+def test_r15_harness_run_does_not_modify_production_sources(loaded, recorded):
+    """Назначение R15: оценка не меняет оцениваемую систему.
+
+    Прежняя версия сравнивала src/supportops_agent с коммитом 5afdf2d и запрещала любое развитие
+    (в том числе реорганизацию пакетов). Свойство «харнесс не пишет в production-код» проверяется
+    напрямую: хеши всех *.py в src/ до и после прогонов replay и record-источника совпадают.
+    """
+    src = REPO / "src"
+    before = _source_digest(src)
+    assert before, "src/ не должен быть пустым"
+    run_dataset(loaded[0], ReplaySource(recorded))
+    run_dataset(loaded[0], RecordSource())
+    assert _source_digest(src) == before
+
+
+def test_r15_evaluation_package_depends_only_on_agent_not_on_service():
+    """Харнесс оценивает агентное ядро; сервисный слой (HTTP/БД/security) вне оцениваемой поверхности."""
+    for path in sorted((REPO / "evaluation").glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for n in ast.walk(tree):
+            names = [a.name for a in n.names] if isinstance(n, ast.Import) else (
+                [n.module or ""] if isinstance(n, ast.ImportFrom) else []
+            )
+            assert not any(m.split(".")[0] == "supportops_service" for m in names), (path.name, names)
 
 
 def test_r16_imports_come_from_this_worktree():

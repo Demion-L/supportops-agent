@@ -10,7 +10,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import OrderStatus
+from supportops_agent.models import OrderStatus
 
 
 class PolicyDecisionType(StrEnum):

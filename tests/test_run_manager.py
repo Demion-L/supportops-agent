@@ -3,7 +3,7 @@ from supportops_agent.models import (
     AgentStep, 
     AgentStepType
     )
-from supportops_agent.run_manager import AgentRunManager
+from supportops_agent.runtime.run_manager import AgentRunManager
 
 
 def test_run_manager_creates_running_run():

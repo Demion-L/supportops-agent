@@ -14,10 +14,10 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
-from .classification import TicketClassification, TicketIntent
-from .models import SupportTicket
-from .policy import PolicyDecision, RefundPolicyEngine
-from .refund_facts import (
+from supportops_agent.classification import TicketClassification, TicketIntent
+from supportops_agent.models import SupportTicket
+from supportops_agent.business.policy import PolicyDecision, RefundPolicyEngine
+from supportops_agent.business.refund_facts import (
     FactsProviderError,
     OrderNotFoundError,
     VerifiedRefundFactsProvider,
@@ -157,7 +157,7 @@ class RefundEvaluationOrchestrator:
 def default_refund_evaluator(today: date | None = None) -> RefundEvaluationOrchestrator:
     """Композиция по умолчанию (доверенные зависимости, фиксированная бизнес-дата)."""
 
-    from . import mock_data
+    from supportops_agent.business import mock_data
 
     return RefundEvaluationOrchestrator(
         VerifiedRefundFactsProvider(),

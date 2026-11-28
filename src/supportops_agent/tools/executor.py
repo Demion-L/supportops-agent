@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from supportops_agent.authorization import (
+from supportops_agent.tools.authorization import (
     DEFAULT_POLICY,
     AuthorizationDecision,
     AuthorizationReason,
@@ -25,7 +25,7 @@ from supportops_agent.authorization import (
     ExecutionContext,
     ToolAuthorizationPolicy,
 )
-from supportops_agent.tool_definitions import TOOL_REGISTRY, ToolDefinition
+from supportops_agent.tools.definitions import TOOL_REGISTRY, ToolDefinition
 
 __all__ = [
     "INVALID_ARGUMENTS_CODE",

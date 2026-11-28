@@ -9,9 +9,9 @@ import json
 
 import pytest
 
-from supportops_agent import mock_data
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import (
+from supportops_agent.business import mock_data
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import (
     SUPPORT_AGENT_ALLOWED_TOOLS,
     AuthorizationDecision,
     AuthorizationReason,
@@ -25,9 +25,9 @@ from supportops_agent.classification import (
     TicketClassification,
 )
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
-from supportops_agent.run_manager import AgentRunManager
-from supportops_agent.tool_executor import TOOL_REGISTRY, ToolCall
-from supportops_agent.tool_executor import execute_tool_call as _execute_tool_call
+from supportops_agent.runtime.run_manager import AgentRunManager
+from supportops_agent.tools.executor import TOOL_REGISTRY, ToolCall
+from supportops_agent.tools.executor import execute_tool_call as _execute_tool_call
 
 # M04 (F-7): ticket_id is no longer a model argument; the trusted ticket/customer
 # come from the application. The wrapper supplies them as the SupportAgent would.

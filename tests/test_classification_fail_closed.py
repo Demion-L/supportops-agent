@@ -9,10 +9,10 @@ import json
 
 import pytest
 
-from supportops_agent import mock_data
-from supportops_agent import agent as agent_module
-from supportops_agent.agent import CLASSIFICATION_FAILURE_RESPONSE, SupportAgent
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.business import mock_data
+from supportops_agent.runtime import agent as agent_module
+from supportops_agent.runtime.agent import CLASSIFICATION_FAILURE_RESPONSE, SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.classification import (
     ClassificationError,
     ClassificationResult,

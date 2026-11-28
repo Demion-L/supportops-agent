@@ -6,9 +6,9 @@ from datetime import date
 
 import pytest
 
-from supportops_agent import mock_data
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import SUPPORT_AGENT_ALLOWED_TOOLS, support_agent_context
+from supportops_agent.business import mock_data
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import SUPPORT_AGENT_ALLOWED_TOOLS, support_agent_context
 from supportops_agent.classification import (
     ClassificationContext,
     ClassificationEntities,
@@ -18,13 +18,13 @@ from supportops_agent.classification import (
     TicketIntent as I,
 )
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
-from supportops_agent.policy import PolicyDecisionType as D, RefundPolicyEngine
-from supportops_agent.refund_evaluation import (
+from supportops_agent.business.policy import PolicyDecisionType as D, RefundPolicyEngine
+from supportops_agent.business.refund_evaluation import (
     RefundEvaluationOrchestrator,
     RefundEvaluationStatus as S,
 )
-from supportops_agent.refund_facts import FactsProviderError, VerifiedRefundFactsProvider
-from supportops_agent.tool_definitions import TOOL_REGISTRY
+from supportops_agent.business.refund_facts import FactsProviderError, VerifiedRefundFactsProvider
+from supportops_agent.tools.definitions import TOOL_REGISTRY
 
 TODAY = mock_data.BUSINESS_DATE
 

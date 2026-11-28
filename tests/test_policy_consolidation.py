@@ -11,9 +11,11 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from supportops_agent import mock_data, refund_evaluation, tools
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import SUPPORT_AGENT_ALLOWED_TOOLS, support_agent_context
+from supportops_agent.business import mock_data
+from supportops_agent.business import refund_evaluation
+from supportops_agent.business import support_tools
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import SUPPORT_AGENT_ALLOWED_TOOLS, support_agent_context
 from supportops_agent.classification import (
     ClassificationContext,
     ClassificationEntities,
@@ -22,16 +24,16 @@ from supportops_agent.classification import (
     TicketIntent as I,
 )
 from supportops_agent.models import AgentRunStatus, AgentStepType, OrderRecord, SupportTicket
-from supportops_agent.policy import PolicyDecisionType as D, RefundPolicyEngine
-from supportops_agent.refund_evaluation import (
+from supportops_agent.business.policy import PolicyDecisionType as D, RefundPolicyEngine
+from supportops_agent.business.refund_evaluation import (
     RefundEvaluationOrchestrator,
     check_refund_eligibility,
     default_refund_evaluator,
 )
-from supportops_agent.refund_facts import VerifiedRefundFactsProvider
-from supportops_agent.refund_response import compose_final_answer
-from supportops_agent.tool_definitions import TOOL_REGISTRY, get_llm_tool_schemas
-from supportops_agent.tool_executor import ToolCall, execute_tool_call
+from supportops_agent.business.refund_facts import VerifiedRefundFactsProvider
+from supportops_agent.business.refund_response import compose_final_answer
+from supportops_agent.tools.definitions import TOOL_REGISTRY, get_llm_tool_schemas
+from supportops_agent.tools.executor import ToolCall, execute_tool_call
 
 ROOT = Path(__file__).resolve().parent.parent
 TODAY = mock_data.BUSINESS_DATE
@@ -119,8 +121,8 @@ def tool_run(name, trusted=None, **args):
 # ---------- F1: единый источник правил ----------
 
 def test_legacy_30_day_logic_is_gone():
-    assert not hasattr(tools, "REFUND_WINDOW_DAYS")
-    assert not hasattr(tools, "check_refund_eligibility")
+    assert not hasattr(support_tools, "REFUND_WINDOW_DAYS")
+    assert not hasattr(support_tools, "check_refund_eligibility")
     src = inspect.getsource(refund_evaluation.check_refund_eligibility)
     for forbidden in ("30", "created_at", "timedelta", "days", "window"):
         assert forbidden not in src, forbidden
@@ -128,13 +130,14 @@ def test_legacy_30_day_logic_is_gone():
 
 def test_only_policy_engine_holds_refund_day_limits():
     # числа окна (40/5) живут только в RefundPolicyConfig
-    for path in (ROOT / "src/supportops_agent").glob("*.py"):
+    for path in (ROOT / "src/supportops_agent").rglob("*.py"):
         if path.name == "policy.py":
             continue
         consts = {n.value for n in ast.walk(ast.parse(path.read_text()))
                   if isinstance(n, ast.Constant) and isinstance(n.value, int)
                   and not isinstance(n.value, bool)}
         assert not {30, 40, 45} & consts, path.name
+    assert len(list((ROOT / "src/supportops_agent").rglob("*.py"))) > 10  # гард не должен сканировать пустоту
 
 
 @pytest.mark.parametrize("days", [0, 39, 40, 41, 45, 46, 69])
@@ -285,7 +288,7 @@ def test_new_domain_fields_do_not_leak_through_lookup_order():
         internal_note: str = "SECRET"
 
     order = Extended(**mock_data.ORDERS["order_001"].model_dump(), internal_note="SECRET")
-    public = tools.serialize_order_for_tool(order)
+    public = support_tools.serialize_order_for_tool(order)
     assert "internal_note" not in public and "delivered_at" not in public
 
 
@@ -474,7 +477,7 @@ def test_executor_flag_on_identity_bound_tools():
 
 
 def test_authorization_gate_still_blocks_refund_tool_when_not_allowed():
-    from supportops_agent.authorization import ExecutionContext
+    from supportops_agent.tools.authorization import ExecutionContext
 
     ctx = ExecutionContext(agent_id="a", allowed_tools=frozenset({"lookup_order"}))
     res = execute_tool_call(

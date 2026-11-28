@@ -6,8 +6,8 @@ from datetime import date, datetime, timedelta
 import pytest
 from pydantic import ValidationError
 
-from supportops_agent import mock_data
-from supportops_agent.policy import (
+from supportops_agent.business import mock_data
+from supportops_agent.business.policy import (
     PolicyDecisionType as D,
     RefundPolicyConfig,
     RefundPolicyEngine,
@@ -135,7 +135,7 @@ def test_no_side_effects():
 def test_engine_module_has_no_clock_or_external_access():
     import inspect
 
-    import supportops_agent.policy as p
+    import supportops_agent.business.policy as p
 
     src = inspect.getsource(p)
     for forbidden in (".today(", ".now(", "random", "openai", "httpx", "requests",
@@ -185,7 +185,7 @@ def test_business_date_is_fixed():
 def test_engine_has_no_classification_dependency():
     import inspect
 
-    import supportops_agent.policy as p
+    import supportops_agent.business.policy as p
 
     src = inspect.getsource(p).lower()
     for forbidden in ("classification", "ticketintent"):

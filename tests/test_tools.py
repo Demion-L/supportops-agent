@@ -1,4 +1,4 @@
-from supportops_agent.tools import lookup_customer, lookup_order
+from supportops_agent.business.support_tools import lookup_customer, lookup_order
 
 
 def test_lookup_customer_returns_customer():

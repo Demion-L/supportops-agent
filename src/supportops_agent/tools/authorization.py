@@ -17,7 +17,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from supportops_agent.tool_definitions import ToolDefinition
+from supportops_agent.tools.definitions import ToolDefinition
 
 __all__ = [
     "AuthorizationDecision",

@@ -12,8 +12,8 @@ LLM не источник финансового решения. Если для
 import json
 import re
 
-from .policy import PolicyDecisionType as D
-from .refund_evaluation import RefundEvaluationResult, RefundEvaluationStatus as S
+from supportops_agent.business.policy import PolicyDecisionType as D
+from supportops_agent.business.refund_evaluation import RefundEvaluationResult, RefundEvaluationStatus as S
 
 DECISION_STATEMENTS: dict[D, str] = {
     D.ALLOW: (

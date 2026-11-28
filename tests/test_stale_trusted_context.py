@@ -9,9 +9,9 @@ import json
 
 import pytest
 
-from supportops_agent import mock_data
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.business import mock_data
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.classification import ClassificationError
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
 
@@ -177,16 +177,16 @@ def test_sr1_state_retained_for_diagnostics_after_run():
 
 # ---- SR-2: normalization consistency / collision invariants -----------------
 
-from supportops_agent import tools  # noqa: E402
+from supportops_agent.business import support_tools  # noqa: E402
 from supportops_agent.models import SupportCase  # noqa: E402
 
 
 @pytest.mark.parametrize("variant", ["ticket_A", " ticket_A ", "ticket_A ", "\tticket_A\n"])
 def test_sr2_equivalent_ticket_ids_share_one_normalized_case(variant):
-    first = tools.create_support_case(
+    first = support_tools.create_support_case(
         "r", "high", trusted_ticket_id="ticket_A", trusted_customer_id="customer_001"
     )
-    again = tools.create_support_case(
+    again = support_tools.create_support_case(
         "r", "low", trusted_ticket_id=variant, trusted_customer_id="customer_001"
     )
     assert first["outcome"] == "created"
@@ -197,13 +197,13 @@ def test_sr2_equivalent_ticket_ids_share_one_normalized_case(variant):
 
 
 def test_sr2_collision_with_foreign_ticket_leaks_nothing_and_overwrites_nothing():
-    cid = tools._case_id("ticket_A", "r")
+    cid = support_tools._case_id("ticket_A", "r")
     foreign = SupportCase(case_id=cid, ticket_id="ticket_B", reason="SECRET", priority="low")
     mock_data.CASES[cid] = foreign
     before = foreign.model_dump()
 
     for variant in ("ticket_A", " ticket_A "):
-        res = tools.create_support_case(
+        res = support_tools.create_support_case(
             "r", "high", trusted_ticket_id=variant, trusted_customer_id="customer_001"
         )
         assert res == {"outcome": "ticket_context_required"}

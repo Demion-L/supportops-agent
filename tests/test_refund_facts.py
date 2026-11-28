@@ -6,10 +6,11 @@ from datetime import date
 
 import pytest
 
-from supportops_agent import mock_data, refund_facts
+from supportops_agent.business import mock_data
+from supportops_agent.business import refund_facts
 from supportops_agent.models import OrderRecord, OrderStatus
-from supportops_agent.policy import VerifiedRefundFacts
-from supportops_agent.refund_facts import OrderNotFoundError, VerifiedRefundFactsProvider
+from supportops_agent.business.policy import VerifiedRefundFacts
+from supportops_agent.business.refund_facts import OrderNotFoundError, VerifiedRefundFactsProvider
 
 provider = VerifiedRefundFactsProvider()
 

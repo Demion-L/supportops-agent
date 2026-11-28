@@ -1,7 +1,7 @@
 import pytest
 
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
 
 
@@ -204,7 +204,7 @@ def test_unknown_order_is_reported_back_to_customer_gracefully():
 
 
 def test_tool_outage_is_surfaced_to_customer_without_crashing_the_run(monkeypatch):
-    from supportops_agent.tool_executor import TOOL_REGISTRY
+    from supportops_agent.tools.executor import TOOL_REGISTRY
 
     def failing_lookup_order(order_id: str, *, trusted_customer_id=None):
         raise RuntimeError("database connection failed")
