@@ -102,7 +102,7 @@ def test_invalid_inbound_request_id_is_replaced(client):
 
 
 def test_support_agent_is_never_invoked(monkeypatch, client):
-    import supportops_agent.agent as agent_mod
+    import supportops_agent.runtime.agent as agent_mod
 
     def boom(*a, **k):
         raise AssertionError("SupportAgent used by the service skeleton")

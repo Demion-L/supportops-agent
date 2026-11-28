@@ -9,17 +9,17 @@ import json
 
 import pytest
 
-from supportops_agent import agent as agent_module
-from supportops_agent.agent import (
+from supportops_agent.runtime import agent as agent_module
+from supportops_agent.runtime.agent import (
     TRACE_MAX_STRING,
     TRACE_MAX_TOTAL_CHARS,
     UNKNOWN_TOOL_LABEL,
     SupportAgent,
     _bound_payload,
 )
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
-from supportops_agent.tool_definitions import TOOL_REGISTRY
+from supportops_agent.tools.definitions import TOOL_REGISTRY
 
 SECRET = "SYNTH_SECRET_ABC123"
 EMAIL = "SYNTH_EMAIL@example.invalid"
@@ -224,7 +224,7 @@ def test_untrusted_tool_name_label_is_fixed():
 
 def test_direct_execute_function_calls_unknown_tool_label():
     agent = SupportAgent(_Client(), context=support_agent_context())
-    from supportops_agent.run_manager import AgentRunManager
+    from supportops_agent.runtime.run_manager import AgentRunManager
 
     agent.run_manager = AgentRunManager("t")
     agent.execute_function_calls([_Call("lookup_order", {"order_id": "order_001"})])
@@ -249,7 +249,7 @@ def test_llm_context_keeps_full_tool_result():
 
 # 14. Trusted Ticket Binding сохранён
 def test_trusted_ticket_binding_still_enforced(monkeypatch):
-    from supportops_agent import mock_data
+    from supportops_agent.business import mock_data
 
     agent, _ = _run(
         _Call("create_support_case", {"reason": "damaged", "priority": "high"}),
@@ -270,14 +270,14 @@ def test_authorization_denied_path_has_only_codes():
 
 
 def test_reason_code_closed_set(monkeypatch):
-    from supportops_agent.tool_executor import ToolResult
+    from supportops_agent.tools.executor import ToolResult
 
     result = ToolResult(
         call_id="c", name="lookup_order", error="x", error_type="authorization_denied",
         reason_code=SECRET, diagnostic_type="PolicyBoom",
     )
     monkeypatch.setattr(SupportAgent, "execute_function_call", lambda self, item: result)
-    from supportops_agent.run_manager import AgentRunManager
+    from supportops_agent.runtime.run_manager import AgentRunManager
 
     agent = SupportAgent(_Client(), context=support_agent_context())
     agent.run_manager = AgentRunManager("t")
@@ -287,8 +287,8 @@ def test_reason_code_closed_set(monkeypatch):
 
 
 def test_untrusted_tool_name_replaced_in_recorded_step(monkeypatch):
-    from supportops_agent.run_manager import AgentRunManager
-    from supportops_agent.tool_executor import ToolResult
+    from supportops_agent.runtime.run_manager import AgentRunManager
+    from supportops_agent.tools.executor import ToolResult
 
     result = ToolResult(call_id="c", name="lookup_order", error="e", error_type="invalid_arguments")
     monkeypatch.setattr(SupportAgent, "execute_function_call", lambda self, item: result)
@@ -342,7 +342,7 @@ from supportops_agent.classification import (  # noqa: E402
     TicketClassification,
     TicketIntent,
 )
-from supportops_agent.authorization import (  # noqa: E402
+from supportops_agent.tools.authorization import (  # noqa: E402
     AuthorizationDecision,
     AuthorizationReason,
     AuthorizationResult,
@@ -577,8 +577,8 @@ def test_classification_usage_sanitized_in_trace():
 
 # ===== H5-review: POLICY_DECISION и diagnostic_type =====
 def test_policy_decision_hostile_evaluator_not_in_trace():
-    from supportops_agent.policy import PolicyDecisionType
-    from supportops_agent.refund_evaluation import (
+    from supportops_agent.business.policy import PolicyDecisionType
+    from supportops_agent.business.refund_evaluation import (
         RefundEvaluationResult, RefundEvaluationStatus)
 
     hostile = RefundEvaluationResult.model_construct(

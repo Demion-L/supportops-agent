@@ -5,7 +5,7 @@ from typing import Protocol
 from openai import OpenAI, OpenAIError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from .models import SupportTicket
+from supportops_agent.models import SupportTicket
 
 CLASSIFIER_MODEL_NAME = "gpt-4.1-mini"
 

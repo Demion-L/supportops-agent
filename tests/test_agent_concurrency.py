@@ -10,9 +10,9 @@ import threading
 
 import pytest
 
-from supportops_agent import mock_data
-from supportops_agent.agent import ConcurrentRunError, SupportAgent
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.business import mock_data
+from supportops_agent.runtime.agent import ConcurrentRunError, SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.classification import ClassificationError
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
 
@@ -269,7 +269,7 @@ def test_t7_finished_trace_is_immutable(failed):
 
 
 def test_t7_manual_run_manager_contract_is_preserved():
-    from supportops_agent.run_manager import AgentRunManager
+    from supportops_agent.runtime.run_manager import AgentRunManager
 
     agent = _agent(_Client())
     agent.run_manager = AgentRunManager("t1")  # existing, documented-by-tests usage
@@ -604,7 +604,7 @@ def test_b1_t6_reentrant_execution_uses_only_the_current_run_identity():
 
 # B2-T1: run_manager swapped between the writability check and the write.
 def test_b2_t1_manager_swap_between_check_and_record_is_harmless():
-    from supportops_agent.run_manager import AgentRunManager
+    from supportops_agent.runtime.run_manager import AgentRunManager
 
     checked = AgentRunManager("t_checked")  # RUNNING, manual
     other = AgentRunManager("t_other")
@@ -637,7 +637,7 @@ def test_b2_t1_manager_swap_between_check_and_record_is_harmless():
 
 # B2-T2: the trace becomes finished while the tool executes -> no write.
 def test_b2_t2_trace_finished_during_tool_execution_gets_no_event():
-    from supportops_agent.run_manager import AgentRunManager
+    from supportops_agent.runtime.run_manager import AgentRunManager
 
     agent = _agent(_Client())
     manager = agent.run_manager = AgentRunManager("t")
@@ -712,7 +712,7 @@ def test_b3_t4_aborted_trace_rejects_late_events(exc):
 # B3 / WP3-H1 F-1: even if recording the failure is itself interrupted, the
 # trace is sealed and the lock is released; the ORIGINAL exception propagates.
 def test_b3_fail_itself_interrupted_still_seals_and_releases(monkeypatch):
-    from supportops_agent.run_manager import AgentRunManager
+    from supportops_agent.runtime.run_manager import AgentRunManager
 
     def broken_fail(self, error=None):
         raise KeyboardInterrupt("second interrupt")
@@ -777,7 +777,7 @@ SECRET = "customer_002 SECRET-secondary"
 
 
 def _break_fail(monkeypatch, exc_factory=lambda: _Secondary(SECRET)):
-    from supportops_agent.run_manager import AgentRunManager
+    from supportops_agent.runtime.run_manager import AgentRunManager
 
     def broken_fail(self, error=None):
         raise exc_factory()
@@ -985,7 +985,7 @@ def test_sv1_success_path_seal_failure_full_lifecycle(monkeypatch):
 
 # H1: manual AgentRunManager contract (F-5 baseline) is still writable.
 def test_h1_manual_run_manager_still_writable_after_closed_run(monkeypatch):
-    from supportops_agent.run_manager import AgentRunManager
+    from supportops_agent.runtime.run_manager import AgentRunManager
 
     _break_fail(monkeypatch)
     _break_seal(monkeypatch)
@@ -1002,7 +1002,7 @@ def test_h1_manual_run_manager_still_writable_after_closed_run(monkeypatch):
 # H1 (review LOW-2): fail() interrupted after setting status but before
 # finished_at -> seal completes the metadata.
 def test_h1_partial_fail_gets_finished_at_from_seal(monkeypatch):
-    from supportops_agent.run_manager import AgentRunManager
+    from supportops_agent.runtime.run_manager import AgentRunManager
 
     def partial_fail(self, error=None):
         self.run.status = AgentRunStatus.FAILED

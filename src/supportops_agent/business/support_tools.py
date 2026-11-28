@@ -2,8 +2,8 @@
 
 import hashlib
 
-from supportops_agent import mock_data
-from supportops_agent.mock_data import CUSTOMERS, ORDERS
+from supportops_agent.business import mock_data
+from supportops_agent.business.mock_data import CUSTOMERS, ORDERS
 from supportops_agent.models import (
     CasePriority,
     OrderRecord,

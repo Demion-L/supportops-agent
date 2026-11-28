@@ -12,18 +12,18 @@ import json
 import pytest
 from pydantic import ConfigDict
 
-from supportops_agent import tools
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.business import support_tools
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.models import AgentStepType, SupportTicket
-from supportops_agent.run_manager import AgentRunManager
-from supportops_agent.tool_definitions import (
+from supportops_agent.runtime.run_manager import AgentRunManager
+from supportops_agent.tools.definitions import (
     TOOL_REGISTRY,
     GetOrderTrackingArguments,
     LookupCustomerArguments,
     LookupOrderArguments,
 )
-from supportops_agent.tool_executor import ToolCall, execute_tool_call
+from supportops_agent.tools.executor import ToolCall, execute_tool_call
 
 OWNER = "customer_001"  # владелец order_001, order_008; профиль customer_001
 FOREIGN_ORDER = "order_002"  # принадлежит customer_002 (UPS-0002, in_transit)
@@ -179,8 +179,8 @@ def test_missing_identity_does_not_touch_storage(monkeypatch):
     def boom(*a, **k):
         raise AssertionError("storage accessed before identity check")
 
-    monkeypatch.setattr(tools, "lookup_order", boom)
-    monkeypatch.setattr(tools, "CUSTOMERS", type("D", (), {"get": boom})())
+    monkeypatch.setattr(support_tools, "lookup_order", boom)
+    monkeypatch.setattr(support_tools, "CUSTOMERS", type("D", (), {"get": boom})())
     for name, args in (
         ("lookup_order", {"order_id": "order_001"}),
         ("lookup_customer", {"customer_id": OWNER}),
@@ -195,10 +195,10 @@ def test_foreign_check_happens_before_data_is_serialized(monkeypatch):
     def boom(*a, **k):
         raise AssertionError("foreign data reached serialization")
 
-    monkeypatch.setattr(tools, "serialize_order_for_tool", boom)
+    monkeypatch.setattr(support_tools, "serialize_order_for_tool", boom)
     assert run_tool("lookup_order", order_id=FOREIGN_ORDER).output is None
 
-    monkeypatch.setattr(tools.mock_data, "TRACKING", type("D", (), {"get": boom})())
+    monkeypatch.setattr(support_tools.mock_data, "TRACKING", type("D", (), {"get": boom})())
     assert run_tool("get_order_tracking", order_id=FOREIGN_ORDER).output == {
         "outcome": "order_not_found", "order_id": FOREIGN_ORDER,
     }
@@ -309,11 +309,11 @@ def test_trusted_identity_is_compared_exactly():
 
 
 def test_ownership_helper_contract():
-    assert tools.get_owned_order("order_001", OWNER).order_id == "order_001"
-    assert tools.get_owned_order(FOREIGN_ORDER, OWNER) is None
-    assert tools.get_owned_order(MISSING_ORDER, OWNER) is None
-    assert tools.get_owned_order("order_001", None) is None
-    assert tools.get_owned_order("order_001", "") is None
+    assert support_tools.get_owned_order("order_001", OWNER).order_id == "order_001"
+    assert support_tools.get_owned_order(FOREIGN_ORDER, OWNER) is None
+    assert support_tools.get_owned_order(MISSING_ORDER, OWNER) is None
+    assert support_tools.get_owned_order("order_001", None) is None
+    assert support_tools.get_owned_order("order_001", "") is None
 
 
 # ---------- Полная цепочка SupportAgent: LLM-контекст и trace ----------
@@ -425,14 +425,14 @@ def test_refund_ownership_semantics_unchanged():
 
 
 def test_internal_lookup_order_keeps_raw_semantics_for_refund_chain():
-    order = tools.lookup_order(FOREIGN_ORDER)  # внутренняя функция: без ownership
+    order = support_tools.lookup_order(FOREIGN_ORDER)  # внутренняя функция: без ownership
     assert order is not None and order.customer_id == FOREIGN_CUSTOMER
-    assert tools.lookup_order(MISSING_ORDER) is None
+    assert support_tools.lookup_order(MISSING_ORDER) is None
 
 
 @pytest.mark.parametrize("name", PROTECTED)
 def test_tool_gate_still_denies_before_object_check(name):
-    from supportops_agent.authorization import ExecutionContext
+    from supportops_agent.tools.authorization import ExecutionContext
 
     ctx = ExecutionContext(agent_id="a", allowed_tools=frozenset({"create_support_case"}))
     arg = {"customer_id": OWNER} if name == "lookup_customer" else {"order_id": "order_001"}
@@ -467,9 +467,9 @@ def _forbid_storage(monkeypatch):
     def boom(*a, **k):
         raise AssertionError("storage accessed without valid trusted identity")
 
-    monkeypatch.setattr(tools, "lookup_order", boom)
-    monkeypatch.setattr(tools, "CUSTOMERS", type("D", (), {"get": boom})())
-    monkeypatch.setattr(tools.mock_data, "TRACKING", type("D", (), {"get": boom})())
+    monkeypatch.setattr(support_tools, "lookup_order", boom)
+    monkeypatch.setattr(support_tools, "CUSTOMERS", type("D", (), {"get": boom})())
+    monkeypatch.setattr(support_tools.mock_data, "TRACKING", type("D", (), {"get": boom})())
 
 
 @pytest.mark.parametrize("trusted", BAD_IDENTITIES, ids=repr)
@@ -486,9 +486,9 @@ def test_invalid_identity_denies_via_executor_without_storage(monkeypatch, name,
 def test_direct_handlers_deny_without_valid_identity(monkeypatch, trusted):
     _forbid_storage(monkeypatch)
     kw = {} if trusted is _MISSING else {"trusted_customer_id": trusted}
-    assert tools.lookup_order_for_tool("order_001", **kw) == IDENTITY_REQUIRED
-    assert tools.lookup_customer(OWNER, **kw) == IDENTITY_REQUIRED
-    assert tools.get_order_tracking("order_001", **kw) == IDENTITY_REQUIRED
+    assert support_tools.lookup_order_for_tool("order_001", **kw) == IDENTITY_REQUIRED
+    assert support_tools.lookup_customer(OWNER, **kw) == IDENTITY_REQUIRED
+    assert support_tools.get_order_tracking("order_001", **kw) == IDENTITY_REQUIRED
 
 
 # ---------- G-1: отказ из-за identity не выглядит как подтверждение ----------

@@ -9,14 +9,14 @@ import threading
 
 import pytest
 
-from supportops_agent import mock_data
-from supportops_agent import agent as agent_module
-from supportops_agent.agent import (
+from supportops_agent.business import mock_data
+from supportops_agent.runtime import agent as agent_module
+from supportops_agent.runtime.agent import (
     CLASSIFICATION_FAILURE_RESPONSE,
     ConcurrentRunError,
     SupportAgent,
 )
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.classification import (
     ClassificationContext,
     ClassificationEntities,
@@ -26,10 +26,10 @@ from supportops_agent.classification import (
     TicketIntent,
 )
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
-from supportops_agent.policy import RefundPolicyEngine
-from supportops_agent.refund_evaluation import RefundEvaluationOrchestrator
-from supportops_agent.refund_facts import VerifiedRefundFactsProvider
-from supportops_agent.run_manager import AgentRunManager
+from supportops_agent.business.policy import RefundPolicyEngine
+from supportops_agent.business.refund_evaluation import RefundEvaluationOrchestrator
+from supportops_agent.business.refund_facts import VerifiedRefundFactsProvider
+from supportops_agent.runtime.run_manager import AgentRunManager
 
 TIMEOUT = 5
 SECRET = "SYNTH_SECRET_ABC123"

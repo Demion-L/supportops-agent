@@ -44,6 +44,7 @@ HERMES **не создан с нуля**. Он наследует весь ин�
 | [`docs/hermes/08-independent-architecture-review.md`](docs/hermes/08-independent-architecture-review.md) | Независимое ревью (способное опровергнуть гипотезу) |
 | [`docs/hermes/09-epoch-ii-roadmap.md`](docs/hermes/09-epoch-ii-roadmap.md) | Epoch II Roadmap: фазы E2-Phase 00–10 |
 | [`docs/hermes/10-post-genesis-state.md`](docs/hermes/10-post-genesis-state.md) | Актуальное состояние после Genesis: worktree, security contract, архив эксперимента |
+| [`docs/architecture/codebase-layout.md`](docs/architecture/codebase-layout.md) | Структура пакетов `supportops_agent`, слои зависимостей, соответствие старых и новых путей (E2-Phase 01) |
 
 Документы Epoch I (`docs/design/`, `docs/security/`, `.monolith/context/`) сохранены без изменений и остаются историческим источником истины для эпохи SupportOps.
 

@@ -26,12 +26,12 @@ from types import SimpleNamespace
 
 from pydantic import ValidationError
 
-from supportops_agent import mock_data
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.business import mock_data
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
-from supportops_agent.refund_evaluation import default_refund_evaluator
-from supportops_agent.tool_definitions import TOOL_REGISTRY
+from supportops_agent.business.refund_evaluation import default_refund_evaluator
+from supportops_agent.tools.definitions import TOOL_REGISTRY
 
 from .fakes import FakeClassifier
 from .invariants import (

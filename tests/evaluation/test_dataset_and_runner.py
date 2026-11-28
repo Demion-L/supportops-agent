@@ -17,8 +17,8 @@ from evaluation.runner import (
     run_scenario,
 )
 from evaluation.schemas import Category, Dataset, Outcome
-from supportops_agent import mock_data
-from supportops_agent.tool_definitions import TOOL_REGISTRY
+from supportops_agent.business import mock_data
+from supportops_agent.tools.definitions import TOOL_REGISTRY
 
 
 @pytest.fixture(scope="module")

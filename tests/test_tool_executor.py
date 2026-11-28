@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from supportops_agent.authorization import support_agent_context
-from supportops_agent.tool_executor import (
+from supportops_agent.tools.authorization import support_agent_context
+from supportops_agent.tools.executor import (
     ToolCall,
     execute_tool_call,
      TOOL_REGISTRY,

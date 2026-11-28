@@ -10,17 +10,17 @@ import json
 
 import pytest
 
-from supportops_agent import mock_data
-from supportops_agent.agent import (
+from supportops_agent.business import mock_data
+from supportops_agent.runtime.agent import (
     CLASSIFICATION_FAILURE_RESPONSE,
     SupportAgent,
     _failure_code,
 )
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.classification import ClassificationError
 from supportops_agent.models import AgentRunStatus, AgentStepType, SupportTicket
-from supportops_agent.tool_definitions import TOOL_REGISTRY
-from supportops_agent.tool_executor import INVALID_ARGUMENTS_CODE, SAFE_ERROR_CODES
+from supportops_agent.tools.definitions import TOOL_REGISTRY
+from supportops_agent.tools.executor import INVALID_ARGUMENTS_CODE, SAFE_ERROR_CODES
 
 PII = "customer_email=private@example.test"
 SECRET = "secret_customer_data"

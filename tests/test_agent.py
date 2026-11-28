@@ -1,10 +1,10 @@
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.models import SupportTicket, AgentRunStatus, AgentStepType
-from supportops_agent.tool_executor import ToolResult
+from supportops_agent.tools.executor import ToolResult
 import pytest
 from pydantic import ValidationError
-from supportops_agent.run_manager import AgentRunManager
+from supportops_agent.runtime.run_manager import AgentRunManager
 
 
 class FakeUsage:
@@ -141,7 +141,7 @@ def test_agent_returns_tool_error_to_model(monkeypatch):
     def failing_tool(order_id: str, *, trusted_customer_id=None):
         raise RuntimeError("database connection failed")
 
-    from supportops_agent.tool_executor import TOOL_REGISTRY
+    from supportops_agent.tools.executor import TOOL_REGISTRY
 
     monkeypatch.setattr(TOOL_REGISTRY["lookup_order"], "handler", failing_tool)
 
@@ -789,7 +789,7 @@ def test_agent_records_token_usage_in_trace_when_available():
 def test_tool_execution_step_records_latency(monkeypatch):
     import time
 
-    from supportops_agent.tool_executor import TOOL_REGISTRY
+    from supportops_agent.tools.executor import TOOL_REGISTRY
 
     def slow_lookup_order(order_id: str, *, trusted_customer_id=None):
         time.sleep(0.02)

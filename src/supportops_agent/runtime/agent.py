@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from openai import OpenAI
 from pydantic import ValidationError
 
-from .classification import (
+from supportops_agent.classification import (
     CLASSIFIER_MODEL_NAME,
     ClassificationError,
     ClassificationResult,
@@ -15,23 +15,23 @@ from .classification import (
     TicketIntent,
     format_classification_context,
 )
-from .agent_state import AgentState
-from .authorization import (
+from supportops_agent.runtime.agent_state import AgentState
+from supportops_agent.tools.authorization import (
     DEFAULT_POLICY,
     AuthorizationReason,
     ExecutionContext,
     ToolAuthorizationPolicy,
 )
-from .models import AgentRun, AgentRunStatus, AgentStepType, SupportTicket
-from .refund_evaluation import (
+from supportops_agent.models import AgentRun, AgentRunStatus, AgentStepType, SupportTicket
+from supportops_agent.business.refund_evaluation import (
     RefundEvaluationOrchestrator,
     RefundEvaluationResult,
     RefundEvaluationStatus,
 )
-from .policy import PolicyDecisionType
-from .refund_response import build_policy_context, compose_final_answer
-from .run_manager import AgentRunManager
-from .tool_executor import (
+from supportops_agent.business.policy import PolicyDecisionType
+from supportops_agent.business.refund_response import build_policy_context, compose_final_answer
+from supportops_agent.runtime.run_manager import AgentRunManager
+from supportops_agent.tools.executor import (
     INVALID_ARGUMENTS_CODE,
     TOOL_REGISTRY,
     ToolCall,
@@ -39,7 +39,7 @@ from .tool_executor import (
     execute_tool_call,
     safe_diagnostic_type,
 )
-from supportops_agent.tool_definitions import get_llm_tool_schemas
+from supportops_agent.tools.definitions import get_llm_tool_schemas
 
 
 MAX_AGENT_STEPS = 10

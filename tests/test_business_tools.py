@@ -4,18 +4,18 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
-from supportops_agent import mock_data
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import support_agent_context
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.business import mock_data
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.models import AgentRunStatus, SupportTicket
-from supportops_agent.tool_definitions import ToolDefinition, get_llm_tool_schemas
-from supportops_agent.tool_executor import (
+from supportops_agent.tools.definitions import ToolDefinition, get_llm_tool_schemas
+from supportops_agent.tools.executor import (
     TOOL_REGISTRY,
     ToolCall,
     execute_tool_call,
 )
-from supportops_agent.refund_evaluation import check_refund_eligibility
+from supportops_agent.business.refund_evaluation import check_refund_eligibility
 
 ALL_TOOLS = {
     "lookup_order",

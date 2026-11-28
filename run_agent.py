@@ -1,11 +1,11 @@
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.classification import OpenAITicketClassifier
 from supportops_agent.models import SupportTicket
-from supportops_agent.refund_evaluation import default_refund_evaluator
+from supportops_agent.business.refund_evaluation import default_refund_evaluator
 
 
 def build_agent(client: OpenAI) -> SupportAgent:

@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .models import SupportTicket
+from supportops_agent.models import SupportTicket
 
 
 @dataclass

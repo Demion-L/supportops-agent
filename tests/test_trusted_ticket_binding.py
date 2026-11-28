@@ -9,13 +9,14 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from supportops_agent import mock_data, tools
-from supportops_agent.agent import SupportAgent
-from supportops_agent.authorization import support_agent_context
+from supportops_agent.business import mock_data
+from supportops_agent.business import support_tools
+from supportops_agent.runtime.agent import SupportAgent
+from supportops_agent.tools.authorization import support_agent_context
 from supportops_agent.models import AgentStepType, SupportCase, SupportTicket
-from supportops_agent.tool_definitions import TOOL_REGISTRY, get_llm_tool_schemas
-from supportops_agent.tool_executor import ToolCall, execute_tool_call
-from supportops_agent.tools import create_support_case
+from supportops_agent.tools.definitions import TOOL_REGISTRY, get_llm_tool_schemas
+from supportops_agent.tools.executor import ToolCall, execute_tool_call
+from supportops_agent.business.support_tools import create_support_case
 
 CUSTOMER = "customer_001"
 TICKET = "ticket_mine"
@@ -142,7 +143,7 @@ def test_refusal_does_not_depend_on_cases_content(monkeypatch):
     mock_data.CASES.clear()
     empty = create_support_case("r", "high", trusted_customer_id=CUSTOMER)
     existing = SupportCase(
-        case_id=tools._case_id(VICTIM, "r"), ticket_id=VICTIM, reason="r", priority="high"
+        case_id=support_tools._case_id(VICTIM, "r"), ticket_id=VICTIM, reason="r", priority="high"
     )
     mock_data.CASES[existing.case_id] = existing
     filled = create_support_case("r", "high", trusted_customer_id=CUSTOMER)
@@ -220,7 +221,7 @@ def test_case_id_algorithm_unchanged():
 
     key = f"{TICKET}\ndamaged item"
     expected = "case_" + hashlib.sha256(key.encode()).hexdigest()[:10]
-    assert tools._case_id(TICKET, " Damaged   ITEM ".strip()) == expected
+    assert support_tools._case_id(TICKET, " Damaged   ITEM ".strip()) == expected
     assert execute({"reason": "Damaged item"}).output["case"]["case_id"] == expected
 
 
@@ -236,7 +237,7 @@ def test_different_trusted_tickets_get_independent_cases():
 
 def test_f7_t7_collision_does_not_leak_or_overwrite(monkeypatch):
     # Force both tickets onto the same case_id (synthetic truncated-hash collision).
-    monkeypatch.setattr(tools, "_case_id", lambda ticket_id, reason: "case_collide")
+    monkeypatch.setattr(support_tools, "_case_id", lambda ticket_id, reason: "case_collide")
     victim = execute(
         {"reason": "SECRET victim reason", "priority": "urgent"}, ticket=VICTIM
     )
@@ -256,7 +257,7 @@ def test_f7_t7_collision_does_not_leak_or_overwrite(monkeypatch):
 
 def test_foreign_case_with_same_case_id_is_never_returned(spy):
     foreign = SupportCase(
-        case_id=tools._case_id(TICKET, "r"), ticket_id=VICTIM, reason="PRIVATE", priority="high"
+        case_id=support_tools._case_id(TICKET, "r"), ticket_id=VICTIM, reason="PRIVATE", priority="high"
     )
     dict.__setitem__(spy, foreign.case_id, foreign)
     result = create_support_case(
@@ -335,7 +336,7 @@ def test_trusted_ticket_not_delivered_to_other_tools(monkeypatch):
 
 
 def test_authorization_gate_still_runs_before_handler(spy):
-    from supportops_agent.authorization import ExecutionContext
+    from supportops_agent.tools.authorization import ExecutionContext
 
     result = execute_tool_call(
         ToolCall(
