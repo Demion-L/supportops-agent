@@ -14,11 +14,11 @@ from concurrent.futures import ThreadPoolExecutor
 import psycopg
 import pytest
 from pg_test_helpers import make_settings
-from supportops_service.db.errors import IdempotencyConflict, StorageFailure, StorageUnavailable
-from supportops_service.db.pool import DatabasePool
-from supportops_service.repositories import _inputs
-from supportops_service.repositories import tickets as tickets_module
-from supportops_service.repositories.tickets import PgTicketRepository
+from hermes_service.db.errors import IdempotencyConflict, StorageFailure, StorageUnavailable
+from hermes_service.db.pool import DatabasePool
+from hermes_service.repositories import _inputs
+from hermes_service.repositories import tickets as tickets_module
+from hermes_service.repositories.tickets import PgTicketRepository
 
 pytestmark = pytest.mark.postgres
 A = "tenant-a"
@@ -50,7 +50,7 @@ def _wait_blocked(dsn, timeout=5.0):
     with psycopg.connect(dsn, autocommit=True) as admin:
         while time.time() < deadline:
             n = admin.execute(
-                "SELECT count(*) FROM pg_stat_activity WHERE application_name='supportops-service' "
+                "SELECT count(*) FROM pg_stat_activity WHERE application_name='hermes-service' "
                 "AND wait_event_type='Lock' AND state='active'"
             ).fetchone()[0]
             if n:
@@ -172,7 +172,7 @@ def test_lock_timeout_on_blocked_insert_is_503_class_and_retry_succeeds(database
     pool = DatabasePool(make_settings(database, lock_timeout_ms=300))
     pool.open()
     try:
-        from supportops_service.db.migrate import migrate
+        from hermes_service.db.migrate import migrate
 
         migrate(pool)
         repo = PgTicketRepository(pool)
@@ -219,7 +219,7 @@ def test_backend_killed_mid_transaction_leaves_no_rows(database, migrated_pool, 
         with _raw_conn(database) as admin:
             row = admin.execute(
                 "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                "WHERE application_name='supportops-service' AND wait_event_type='Lock' AND state='active'"
+                "WHERE application_name='hermes-service' AND wait_event_type='Lock' AND state='active'"
             ).fetchall()
             killed = len(row)
         time.sleep(0.05)

@@ -2,7 +2,7 @@
 
 Behavior-preserving реорганизация `src/supportops_agent`. Функциональность, публичные контракты HTTP-сервиса,
 security-инварианты и Evaluation recordings не менялись; изменены только расположение модулей и пути импорта.
-Пакеты по-прежнему называются `supportops_agent` / `supportops_service` (переименование в HERMES — отдельная задача).
+Пакет HTTP-сервиса переименован `supportops_service` → `hermes_service` (Technical Identity Migration, `docs/hermes/11-technical-identity-migration.md`); `supportops_agent` сохраняет имя предметного домена SupportOps.
 
 ## Карта
 
@@ -26,7 +26,7 @@ src/
       agent.py                 SupportAgent: цикл LLM↔tools, sanitization трассы (SR-4), fail-safe
       agent_state.py           Состояние одного прогона
       run_manager.py           Жизненный цикл AgentRun
-  supportops_service/          HTTP-сервис (FastAPI), security, PostgreSQL — не изменялся
+  hermes_service/          HTTP-сервис (FastAPI), security, PostgreSQL — не изменялся
 evaluation/                    Evaluation Harness (fake / record / replay), импортирует только supportops_agent
 experiments/agent_commons/     Изолированный эксперимент, не импортирует supportops_agent
 ```
@@ -44,7 +44,7 @@ models  ←  classification  ←  business  ←  tools  ←  runtime
 | `tools` | `models`, `business` |
 | `runtime` | `models`, `classification`, `business`, `tools` |
 
-`supportops_service` и `supportops_agent` по-прежнему не импортируют друг друга. Границы проверяет
+`hermes_service` и `supportops_agent` по-прежнему не импортируют друг друга. Границы проверяет
 `tests/test_package_layering.py` (направление зависимостей, запрет относительных импортов, запрет импорта service-слоя).
 
 ## Почему так

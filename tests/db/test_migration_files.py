@@ -2,8 +2,8 @@
 
 import pytest
 
-from supportops_service.db.errors import MigrationSetError
-from supportops_service.db.migrate import checksum_of, load_migrations
+from hermes_service.db.errors import MigrationSetError
+from hermes_service.db.migrate import checksum_of, load_migrations
 
 
 def test_packaged_migrations_load_and_are_contiguous():

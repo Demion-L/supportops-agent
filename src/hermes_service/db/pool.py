@@ -21,10 +21,10 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool, PoolClosed, PoolTimeout
 from pydantic import SecretStr
 
-from supportops_service.config import ENV_PREFIX, ServiceConfigurationError
-from supportops_service.db.errors import StorageUnavailable
+from hermes_service.config import ENV_PREFIX, ServiceConfigurationError, read_env
+from hermes_service.db.errors import StorageUnavailable
 
-logger = logging.getLogger("supportops_service.db")
+logger = logging.getLogger("hermes_service.db")
 
 DATABASE_URL_ENV: Final = f"{ENV_PREFIX}DATABASE_URL"
 
@@ -42,7 +42,7 @@ class DatabaseSettings:
     statement_timeout_ms: int = 5000
     lock_timeout_ms: int = 2000
     idle_in_transaction_timeout_ms: int = 10000
-    application_name: str = "supportops-service"
+    application_name: str = "hermes-service"
 
     def __post_init__(self) -> None:
         if not isinstance(self.dsn, SecretStr) or not self.dsn.get_secret_value().strip():
@@ -65,7 +65,7 @@ class DatabaseSettings:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> DatabaseSettings:
         source = os.environ if env is None else env
-        raw = source.get(DATABASE_URL_ENV)
+        raw = read_env(source, "DATABASE_URL")
         if raw is None or not raw.strip():
             raise ServiceConfigurationError(f"{DATABASE_URL_ENV} is required.")
         return cls(dsn=SecretStr(raw.strip()))

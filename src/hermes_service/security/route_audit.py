@@ -20,7 +20,7 @@ from collections.abc import Collection
 from fastapi import FastAPI
 from fastapi.routing import APIRoute, iter_route_contexts
 
-from supportops_service.security.dependencies import SecuredRoute, scope_required_by
+from hermes_service.security.dependencies import SecuredRoute, scope_required_by
 
 PROTECTED_PREFIX = "/v1"
 

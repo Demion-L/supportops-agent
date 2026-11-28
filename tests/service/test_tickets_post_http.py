@@ -11,8 +11,8 @@ import httpx
 import pytest
 from test_tickets_http import MARKER, Env, bearer, shape
 
-from supportops_service.db.errors import StorageFailure, StorageUnavailable
-from supportops_service.security.credentials import generate_api_key
+from hermes_service.db.errors import StorageFailure, StorageUnavailable
+from hermes_service.security.credentials import generate_api_key
 
 BODY = {"customer_id": "cust-1", "message": "Where is my order?", "order_id": "ord-1"}
 KEY = "idem-key-0001"

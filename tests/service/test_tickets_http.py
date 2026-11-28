@@ -12,16 +12,16 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 
-from supportops_service.app import create_app
-from supportops_service.config import ServiceSettings
-from supportops_service.db.errors import StorageFailure, StorageUnavailable
-from supportops_service.interfaces import CredentialRecord
-from supportops_service.repositories.fakes import InMemoryTicketRepository
-from supportops_service.repositories.protocols import TicketView
-from supportops_service.routers.tickets import create_tickets_router
-from supportops_service.schemas import TicketResponse
-from supportops_service.security.credentials import compute_key_hash, generate_api_key
-from supportops_service.security.route_audit import find_unsecured_routes
+from hermes_service.app import create_app
+from hermes_service.config import ServiceSettings
+from hermes_service.db.errors import StorageFailure, StorageUnavailable
+from hermes_service.interfaces import CredentialRecord
+from hermes_service.repositories.fakes import InMemoryTicketRepository
+from hermes_service.repositories.protocols import TicketView
+from hermes_service.routers.tickets import create_tickets_router
+from hermes_service.schemas import TicketResponse
+from hermes_service.security.credentials import compute_key_hash, generate_api_key
+from hermes_service.security.route_audit import find_unsecured_routes
 
 PEPPER = "http-slice-pepper-0123456789abcdefgh"
 SETTINGS = ServiceSettings(pepper=PEPPER, pepper_id="p1")  # type: ignore[arg-type]
@@ -265,7 +265,7 @@ def test_unavailable_error_type_is_the_documented_one():
 
 
 def test_router_module_imports_no_agent_driver_or_sql():
-    src = pathlib.Path("src/supportops_service/routers/tickets.py").read_text()
+    src = pathlib.Path("src/hermes_service/routers/tickets.py").read_text()
     imported = {n.module.split(".")[0] if isinstance(n, ast.ImportFrom) and n.module else a.name.split(".")[0]
                 for n in ast.walk(ast.parse(src)) for a in (getattr(n, "names", None) or [None])
                 if isinstance(n, (ast.Import, ast.ImportFrom)) and (a is not None or isinstance(n, ast.ImportFrom))}

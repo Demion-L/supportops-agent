@@ -1,8 +1,8 @@
 """Real-PostgreSQL harness for the credential repository (Alpha).
 
-Needs Beta's ``supportops_service.db`` (pool + migrations) and a server reachable through
-``SUPPORTOPS_TEST_DATABASE_URL`` where the user may CREATE DATABASE / CREATE ROLE. Every test gets
-a throwaway database. Without them the tests skip -- unless ``SUPPORTOPS_REQUIRE_PG=1`` (CI /
+Needs Beta's ``hermes_service.db`` (pool + migrations) and a server reachable through
+``HERMES_TEST_DATABASE_URL`` (legacy ``SUPPORTOPS_TEST_DATABASE_URL`` still accepted) where the user may CREATE DATABASE / CREATE ROLE. Every test gets
+a throwaway database. Without them the tests skip -- unless ``HERMES_REQUIRE_PG=1`` (CI /
 Integration Gate), where absence is a hard FAILURE. A skipped run is NOT a verification.
 """
 
@@ -14,12 +14,20 @@ from collections.abc import Iterator
 
 import pytest
 
-TEST_DSN_ENV = "SUPPORTOPS_TEST_DATABASE_URL"
-REQUIRE_PG_ENV = "SUPPORTOPS_REQUIRE_PG"
+TEST_DSN_ENV = "HERMES_TEST_DATABASE_URL"
+REQUIRE_PG_ENV = "HERMES_REQUIRE_PG"
+
+
+def _env(name: str) -> str:
+    """HERMES_* variable with the deprecated SUPPORTOPS_* fallback (test infrastructure)."""
+    value = os.environ.get(name, "").strip()
+    if not value and name.startswith("HERMES_"):
+        value = os.environ.get("SUPPORTOPS_" + name[len("HERMES_"):], "").strip()
+    return value
 
 
 def _required() -> bool:
-    return os.environ.get(REQUIRE_PG_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+    return _env(REQUIRE_PG_ENV).lower() in {"1", "true", "yes", "on"}
 
 
 def _unavailable(reason: str):
@@ -37,10 +45,10 @@ def pg():
         from psycopg.conninfo import make_conninfo
         from pydantic import SecretStr
 
-        from supportops_service.db.migrate import migrate
-        from supportops_service.db.pool import DatabasePool, DatabaseSettings
+        from hermes_service.db.migrate import migrate
+        from hermes_service.db.pool import DatabasePool, DatabaseSettings
     except ImportError:
-        _unavailable("psycopg or supportops_service.db (Beta persistence foundation) is missing")
+        _unavailable("psycopg or hermes_service.db (Beta persistence foundation) is missing")
 
     class _PG:
         pass
@@ -53,7 +61,7 @@ def pg():
 
 @pytest.fixture(scope="session")
 def admin_dsn(pg) -> str:
-    dsn = os.environ.get(TEST_DSN_ENV, "").strip()
+    dsn = _env(TEST_DSN_ENV)
     if not dsn:
         _unavailable(f"{TEST_DSN_ENV} is not set")
     try:

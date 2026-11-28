@@ -17,11 +17,11 @@ from typing import Final
 
 import psycopg
 
-from supportops_service.db.errors import IdempotencyConflict, StorageFailure, StorageUnavailable
-from supportops_service.db.pool import DatabasePool
-from supportops_service.ids import is_ticket_id, new_run_id, new_ticket_id
-from supportops_service.repositories import _inputs
-from supportops_service.repositories.protocols import CreateResult, TicketView
+from hermes_service.db.errors import IdempotencyConflict, StorageFailure, StorageUnavailable
+from hermes_service.db.pool import DatabasePool
+from hermes_service.ids import is_ticket_id, new_run_id, new_ticket_id
+from hermes_service.repositories import _inputs
+from hermes_service.repositories.protocols import CreateResult, TicketView
 
 _INSERT_TICKET: Final = (
     "INSERT INTO tickets (ticket_id, tenant_id, customer_id, message, order_id, "

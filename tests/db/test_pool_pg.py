@@ -7,9 +7,9 @@ import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from supportops_service.db.errors import StorageUnavailable
-from supportops_service.db.migrate import migrate
-from supportops_service.db.pool import DatabasePool
+from hermes_service.db.errors import StorageUnavailable
+from hermes_service.db.migrate import migrate
+from hermes_service.db.pool import DatabasePool
 
 from pg_test_helpers import make_settings
 
@@ -29,7 +29,7 @@ def test_pool_serves_queries_with_configured_session(pool):
             "SELECT current_setting('statement_timeout') s, current_setting('lock_timeout') l, "
             "current_setting('idle_in_transaction_session_timeout') i, current_setting('application_name') a"
         ).fetchone()
-    assert row == {"s": "5s", "l": "2s", "i": "10s", "a": "supportops-service"}
+    assert row == {"s": "5s", "l": "2s", "i": "10s", "a": "hermes-service"}
     pool.check()
 
 

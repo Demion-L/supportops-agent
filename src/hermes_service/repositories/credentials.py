@@ -29,9 +29,9 @@ import re
 from contextlib import AbstractContextManager
 from typing import Any, Final, Protocol
 
-from supportops_service.interfaces import CredentialRecord
+from hermes_service.interfaces import CredentialRecord
 
-logger = logging.getLogger("supportops_service.credentials_repository")
+logger = logging.getLogger("hermes_service.credentials_repository")
 
 _PREFIX: Final = re.compile(r"[a-z2-7]{12}")
 

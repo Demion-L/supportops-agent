@@ -13,22 +13,22 @@ from conftest import NOW, FixedClock, bearer
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from supportops_service.app import create_app
-from supportops_service.config import ServiceSettings
-from supportops_service.interfaces import Scope, TenantContext
-from supportops_service.repositories.credentials import PostgresCredentialRepository
-from supportops_service.security.credentials import (
+from hermes_service.app import create_app
+from hermes_service.config import ServiceSettings
+from hermes_service.interfaces import Scope, TenantContext
+from hermes_service.repositories.credentials import PostgresCredentialRepository
+from hermes_service.security.credentials import (
     CredentialVerifier,
     PepperSet,
     generate_api_key,
 )
-from supportops_service.security.dependencies import (
+from hermes_service.security.dependencies import (
     AuthenticationGate,
     SecuredRoute,
     install_security,
     require_scope,
 )
-from supportops_service.security.route_audit import find_scopes_outside_route_signature
+from hermes_service.security.route_audit import find_scopes_outside_route_signature
 
 # ---------------------------------------------------------------- F1: resource exhaustion
 
@@ -244,7 +244,7 @@ def test_touch_never_changes_the_authentication_result(env):
 
 
 def test_touch_is_rate_limited_in_sql_and_only_after_success():
-    from supportops_service.repositories import credentials as mod
+    from hermes_service.repositories import credentials as mod
 
     sql = mod._TOUCH_LAST_USED
     assert "last_used_at < now() - make_interval" in sql and "last_used_at IS NULL" in sql

@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from supportops_service.repositories.protocols import CreateResult, TicketView
+from hermes_service.repositories.protocols import CreateResult, TicketView
 
 RunStatus = Literal["accepted", "running", "completed", "failed"]
 

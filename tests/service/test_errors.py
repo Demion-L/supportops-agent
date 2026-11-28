@@ -2,8 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, ConfigDict
 
-from supportops_service.app import create_app
-from supportops_service.config import ServiceSettings
+from hermes_service.app import create_app
+from hermes_service.config import ServiceSettings
 
 MARKER = "SECRET-MARKER-9f3a"
 
@@ -86,7 +86,7 @@ def test_500_is_safe(probe_client):
 
 
 def test_500_server_log_has_no_exception_message(probe_client, caplog):
-    with caplog.at_level("ERROR", logger="supportops_service"):
+    with caplog.at_level("ERROR", logger="hermes_service"):
         probe_client.get("/boom")
     assert "RuntimeError" in caplog.text
     assert MARKER not in caplog.text

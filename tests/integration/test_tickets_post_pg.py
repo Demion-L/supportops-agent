@@ -10,10 +10,10 @@ import pytest
 from test_alpha_beta_integration_pg import PEPPER, SETTINGS, bearer, issue
 from test_tickets_http_pg import MISSING, shape
 
-from supportops_service.app import create_app
-from supportops_service.repositories.credentials import PostgresCredentialRepository
-from supportops_service.repositories.tickets import PgTicketRepository
-from supportops_service.routers.tickets import create_tickets_router
+from hermes_service.app import create_app
+from hermes_service.repositories.credentials import PostgresCredentialRepository
+from hermes_service.repositories.tickets import PgTicketRepository
+from hermes_service.routers.tickets import create_tickets_router
 
 pytestmark = pytest.mark.postgres
 

@@ -8,16 +8,16 @@ from fastapi import APIRouter, Depends, FastAPI, WebSocket
 from fastapi.testclient import TestClient
 
 from conftest import WriteBody, bearer
-from supportops_service.app import create_app
-from supportops_service.config import ServiceSettings
-from supportops_service.interfaces import TenantContext
-from supportops_service.interfaces import Scope
-from supportops_service.security.dependencies import (
+from hermes_service.app import create_app
+from hermes_service.config import ServiceSettings
+from hermes_service.interfaces import TenantContext
+from hermes_service.interfaces import Scope
+from hermes_service.security.dependencies import (
     SecuredRoute,
     install_security,
     require_scope,
 )
-from supportops_service.security.route_audit import find_unsecured_routes
+from hermes_service.security.route_audit import find_unsecured_routes
 
 
 def test_real_application_has_no_unsecured_v1_route():
@@ -187,7 +187,7 @@ def test_audit_detects_parameterised_catch_all_and_root_mount_shadowing():
     from fastapi import FastAPI
     from fastapi.routing import APIRouter
 
-    from supportops_service.security.route_audit import find_unsecured_routes
+    from hermes_service.security.route_audit import find_unsecured_routes
 
     def build(register):
         app = FastAPI()
@@ -207,7 +207,7 @@ def test_audit_detects_parameterised_catch_all_and_root_mount_shadowing():
 
 def test_hostile_record_object_is_denied_not_500(env):
     from conftest import bearer  # noqa: F401
-    from supportops_service.security.errors import Unauthenticated
+    from hermes_service.security.errors import Unauthenticated
 
     issued = env.issue()
 

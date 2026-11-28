@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 
-from supportops_service.db.pool import DatabasePool
-from supportops_service.repositories.fakes import InMemoryTicketRepository
-from supportops_service.repositories.tickets import PgTicketRepository
+from hermes_service.db.pool import DatabasePool
+from hermes_service.repositories.fakes import InMemoryTicketRepository
+from hermes_service.repositories.tickets import PgTicketRepository
 
 RUN_FAIL_TRIGGER = """
 CREATE FUNCTION wp2_fail_run_insert() RETURNS trigger LANGUAGE plpgsql AS $$

@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "supportops-agent"
+name = "hermes"
 version = "0.1.0"
 description = "An agentic operations platform for coordinating enterprise workflows, tools, services, and human decisions."
 readme = "README.md"
@@ -22,14 +22,14 @@ dependencies = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-supportops_service = ["db/migrations/*.sql"]
+hermes_service = ["db/migrations/*.sql"]
 
 [tool.pytest.ini_options]
 # Импорт строго из текущего worktree: src/ и корень (evaluation/) имеют приоритет
-# над любым другим editable-установленным supportops_agent.
+# над любым другим editable-установленным hermes / supportops_agent.
 pythonpath = ["src", "."]
 markers = [
-    "postgres: needs a real PostgreSQL (SUPPORTOPS_TEST_DATABASE_URL); SUPPORTOPS_REQUIRE_PG=1 makes absence a failure",
+    "postgres: needs a real PostgreSQL (HERMES_TEST_DATABASE_URL); HERMES_REQUIRE_PG=1 makes absence a failure",
 ]
 
 [dependency-groups]

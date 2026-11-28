@@ -18,10 +18,10 @@ from typing import Final
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from supportops_service.errors import error_body
-from supportops_service.middleware import REQUEST_ID_HEADER, get_request_id
+from hermes_service.errors import error_body
+from hermes_service.middleware import REQUEST_ID_HEADER, get_request_id
 
-logger = logging.getLogger("supportops_service.security")
+logger = logging.getLogger("hermes_service.security")
 
 _LOG_SAFE_ID: Final = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
 

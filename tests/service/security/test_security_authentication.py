@@ -8,14 +8,14 @@ from datetime import timedelta
 import pytest
 from conftest import NOW, PEPPER, bearer
 
-from supportops_service.security import credentials as credentials_module
-from supportops_service.security.credentials import (
+from hermes_service.security import credentials as credentials_module
+from hermes_service.security.credentials import (
     PepperSet,
     compute_key_hash,
     generate_api_key,
     parse_authorization,
 )
-from supportops_service.security.errors import Unauthenticated
+from hermes_service.security.errors import Unauthenticated
 
 FIXED_RID = {"X-Request-ID": "fixed-request-id-1"}
 
@@ -148,9 +148,9 @@ def test_touch_failure_does_not_change_the_decision(client, env):
 def test_unconfigured_security_denies(env):
     from fastapi.testclient import TestClient
 
-    from supportops_service.app import create_app
-    from supportops_service.config import ServiceSettings
-    from supportops_service.security.dependencies import authenticate
+    from hermes_service.app import create_app
+    from hermes_service.config import ServiceSettings
+    from hermes_service.security.dependencies import authenticate
 
     app = create_app(ServiceSettings())
     from fastapi import Depends
@@ -267,7 +267,7 @@ def test_odd_datetimes_deny_instead_of_500(client, env):
 
 
 def test_repository_exception_is_not_chained(env):
-    from supportops_service.security.errors import AuthenticationUnavailable
+    from hermes_service.security.errors import AuthenticationUnavailable
 
     env.repo.fail_lookup = RuntimeError("postgres://u:pw@db SECRET-DSN")
     with pytest.raises(AuthenticationUnavailable) as info:

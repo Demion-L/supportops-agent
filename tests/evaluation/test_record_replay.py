@@ -714,7 +714,7 @@ def test_r15_evaluation_package_depends_only_on_agent_not_on_service():
             names = [a.name for a in n.names] if isinstance(n, ast.Import) else (
                 [n.module or ""] if isinstance(n, ast.ImportFrom) else []
             )
-            assert not any(m.split(".")[0] == "supportops_service" for m in names), (path.name, names)
+            assert not any(m.split(".")[0] == "hermes_service" for m in names), (path.name, names)
 
 
 def test_r16_imports_come_from_this_worktree():

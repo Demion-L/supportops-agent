@@ -7,25 +7,25 @@ from collections.abc import Sequence
 
 from fastapi import APIRouter, FastAPI
 
-from supportops_service import __version__
-from supportops_service.config import ServiceConfigurationError, ServiceSettings
-from supportops_service.errors import install_error_handlers
-from supportops_service.interfaces import Clock, CredentialRepository
-from supportops_service.llm_mode import resolve_llm_mode
-from supportops_service.middleware import RequestContextMiddleware
-from supportops_service.routers import health
-from supportops_service.security.credentials import CredentialVerifier, PepperSet
-from supportops_service.security.dependencies import (
+from hermes_service import __version__
+from hermes_service.config import ServiceConfigurationError, ServiceSettings
+from hermes_service.errors import install_error_handlers
+from hermes_service.interfaces import Clock, CredentialRepository
+from hermes_service.llm_mode import resolve_llm_mode
+from hermes_service.middleware import RequestContextMiddleware
+from hermes_service.routers import health
+from hermes_service.security.credentials import CredentialVerifier, PepperSet
+from hermes_service.security.dependencies import (
     DEFAULT_AUTH_QUEUE_WAIT_SECONDS,
     DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS,
     install_security,
 )
-from supportops_service.security.route_audit import (
+from hermes_service.security.route_audit import (
     find_scopes_outside_route_signature,
     find_unsecured_routes,
 )
 
-logger = logging.getLogger("supportops_service.app")
+logger = logging.getLogger("hermes_service.app")
 
 
 def create_app(
@@ -61,7 +61,7 @@ def create_app(
 
     docs = settings.docs_enabled
     app = FastAPI(
-        title="SupportOps Service API",
+        title="HERMES Service API",
         version=__version__,
         docs_url="/docs" if docs else None,
         redoc_url="/redoc" if docs else None,

@@ -5,9 +5,9 @@ import threading
 import psycopg
 import pytest
 
-from supportops_service.db.errors import MigrationChecksumMismatch, MigrationSetError
-from supportops_service.db.migrate import current_version, migrate
-from supportops_service.db.pool import DatabasePool
+from hermes_service.db.errors import MigrationChecksumMismatch, MigrationSetError
+from hermes_service.db.migrate import current_version, migrate
+from hermes_service.db.pool import DatabasePool
 
 from pg_test_helpers import make_settings
 

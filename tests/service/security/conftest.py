@@ -11,16 +11,16 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, ConfigDict
 
-from supportops_service.app import create_app
-from supportops_service.config import ServiceSettings
-from supportops_service.interfaces import CredentialRecord, Scope, TenantContext
-from supportops_service.security.credentials import (
+from hermes_service.app import create_app
+from hermes_service.config import ServiceSettings
+from hermes_service.interfaces import CredentialRecord, Scope, TenantContext
+from hermes_service.security.credentials import (
     CredentialVerifier,
     PepperSet,
     compute_key_hash,
     generate_api_key,
 )
-from supportops_service.security.dependencies import (
+from hermes_service.security.dependencies import (
     SecuredRoute,
     authenticate,
     install_security,

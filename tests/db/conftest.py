@@ -1,8 +1,8 @@
 """PostgreSQL integration harness.
 
-Real PostgreSQL only (no SQLite, no mocks). ``SUPPORTOPS_TEST_DATABASE_URL`` must
+Real PostgreSQL only (no SQLite, no mocks). ``HERMES_TEST_DATABASE_URL`` (legacy ``SUPPORTOPS_TEST_DATABASE_URL`` still accepted) must
 point at a server where the user may CREATE DATABASE; every test gets its own
-throwaway database. Without it, tests skip -- unless ``SUPPORTOPS_REQUIRE_PG=1``
+throwaway database. Without it, tests skip -- unless ``HERMES_REQUIRE_PG=1``
 (CI), where absence or unreachability is a hard failure so nothing goes green
 silently.
 """
@@ -18,14 +18,22 @@ import psycopg.sql
 import pytest
 from psycopg.conninfo import make_conninfo
 from pg_test_helpers import make_settings
-from supportops_service.db.pool import DatabasePool
+from hermes_service.db.pool import DatabasePool
 
-TEST_DSN_ENV = "SUPPORTOPS_TEST_DATABASE_URL"
-REQUIRE_PG_ENV = "SUPPORTOPS_REQUIRE_PG"
+TEST_DSN_ENV = "HERMES_TEST_DATABASE_URL"
+REQUIRE_PG_ENV = "HERMES_REQUIRE_PG"
+
+
+def _env(name: str) -> str:
+    """HERMES_* variable with the deprecated SUPPORTOPS_* fallback (test infrastructure)."""
+    value = os.environ.get(name, "").strip()
+    if not value and name.startswith("HERMES_"):
+        value = os.environ.get("SUPPORTOPS_" + name[len("HERMES_"):], "").strip()
+    return value
 
 
 def _required() -> bool:
-    return os.environ.get(REQUIRE_PG_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+    return _env(REQUIRE_PG_ENV).lower() in {"1", "true", "yes", "on"}
 
 
 def _unavailable(reason: str):
@@ -36,7 +44,7 @@ def _unavailable(reason: str):
 
 @pytest.fixture(scope="session")
 def admin_dsn() -> str:
-    dsn = os.environ.get(TEST_DSN_ENV, "").strip()
+    dsn = _env(TEST_DSN_ENV)
     if not dsn:
         _unavailable(f"{TEST_DSN_ENV} is not set")
     try:
@@ -85,7 +93,7 @@ def pool(database) -> Iterator[DatabasePool]:
 
 @pytest.fixture
 def migrated_pool(pool) -> DatabasePool:
-    from supportops_service.db.migrate import migrate
+    from hermes_service.db.migrate import migrate
 
     migrate(pool)
     return pool
@@ -93,7 +101,7 @@ def migrated_pool(pool) -> DatabasePool:
 
 @pytest.fixture(scope="module")
 def _module_migrated_pool(module_database) -> Iterator[DatabasePool]:
-    from supportops_service.db.migrate import migrate
+    from hermes_service.db.migrate import migrate
 
     p = DatabasePool(make_settings(module_database, max_size=4))
     p.open()

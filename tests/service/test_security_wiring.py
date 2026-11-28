@@ -6,12 +6,12 @@ import pytest
 from fastapi import APIRouter, Depends, HTTPException, WebSocket
 from fastapi.testclient import TestClient
 
-from supportops_service.app import create_app
-from supportops_service.config import ServiceConfigurationError, ServiceSettings
-from supportops_service.interfaces import Scope, TenantContext
-from supportops_service.security.credentials import compute_key_hash, generate_api_key
-from supportops_service.security.dependencies import SecuredRoute, require_scope
-from supportops_service.security.route_audit import find_unsecured_routes
+from hermes_service.app import create_app
+from hermes_service.config import ServiceConfigurationError, ServiceSettings
+from hermes_service.interfaces import Scope, TenantContext
+from hermes_service.security.credentials import compute_key_hash, generate_api_key
+from hermes_service.security.dependencies import SecuredRoute, require_scope
+from hermes_service.security.route_audit import find_unsecured_routes
 
 PEPPER = "wiring-test-pepper-0123456789abcdef"
 SETTINGS = ServiceSettings(pepper=PEPPER, pepper_id="p1")  # type: ignore[arg-type]
@@ -30,7 +30,7 @@ class Repo:
 
 
 def _issue(repo, scopes=("tickets:read",)):
-    from supportops_service.interfaces import CredentialRecord
+    from hermes_service.interfaces import CredentialRecord
 
     key = generate_api_key()
     repo.records[key.prefix] = CredentialRecord(

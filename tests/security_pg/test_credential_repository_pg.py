@@ -15,19 +15,19 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from supportops_service.interfaces import TenantContext
-from supportops_service.repositories.credentials import (
+from hermes_service.interfaces import TenantContext
+from hermes_service.repositories.credentials import (
     CredentialStoreError,
     PostgresCredentialRepository,
 )
-from supportops_service.interfaces import Scope
-from supportops_service.security.credentials import (
+from hermes_service.interfaces import Scope
+from hermes_service.security.credentials import (
     CredentialVerifier,
     PepperSet,
     compute_key_hash,
     generate_api_key,
 )
-from supportops_service.security.dependencies import install_security, require_scope
+from hermes_service.security.dependencies import install_security, require_scope
 
 pytestmark = pytest.mark.postgres
 
@@ -102,7 +102,7 @@ def test_timestamps_are_timezone_aware(pool, repo):
 
 
 def test_wrong_secret_unknown_prefix_unknown_pepper_are_all_401(pool, verifier):
-    from supportops_service.security.errors import Unauthenticated
+    from hermes_service.security.errors import Unauthenticated
 
     good, _, prefix = insert_credential(pool)
     wrong_secret = f"sok1.{prefix}.{'A' * 43}"
@@ -115,7 +115,7 @@ def test_wrong_secret_unknown_prefix_unknown_pepper_are_all_401(pool, verifier):
 
 
 def test_revoked_and_expired_are_checked_on_every_request(pool, verifier):
-    from supportops_service.security.errors import Unauthenticated
+    from hermes_service.security.errors import Unauthenticated
 
     token, cred_id, _ = insert_credential(pool, expires_at=NOW + timedelta(hours=1))
     assert verifier.authenticate(bearer(token))
@@ -133,7 +133,7 @@ def test_revoked_and_expired_are_checked_on_every_request(pool, verifier):
 
 
 def test_hash_stored_as_bytes_is_the_only_secret_comparison(pool, verifier):
-    from supportops_service.security.errors import Unauthenticated
+    from hermes_service.security.errors import Unauthenticated
 
     key = generate_api_key()
     # Row whose hash is the raw secret bytes instead of HMAC: must not authenticate.
@@ -163,7 +163,7 @@ def test_touch_updates_only_after_success_and_is_throttled(pool):
     throttled = PostgresCredentialRepository(pool, touch_min_interval_seconds=3600)
     token, cred_id, _ = insert_credential(pool)
     assert last_used(pool, cred_id) is None
-    from supportops_service.security.errors import Unauthenticated
+    from hermes_service.security.errors import Unauthenticated
 
     with pytest.raises(Unauthenticated):
         clock_verifier(throttled).authenticate(bearer(f"sok1.{generate_api_key().prefix}.{'A' * 43}"))
@@ -237,7 +237,7 @@ def test_lock_timeout_is_a_store_error(pool, pg, make_pool, database):
 
 
 def test_statement_timeout_is_a_store_error(make_pool, monkeypatch):
-    import supportops_service.repositories.credentials as mod
+    import hermes_service.repositories.credentials as mod
 
     fast = make_pool(statement_timeout_ms=200)
     repo = PostgresCredentialRepository(fast)
