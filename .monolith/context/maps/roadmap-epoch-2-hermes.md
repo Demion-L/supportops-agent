@@ -23,7 +23,7 @@ authority: authoritative
 | Фаза | Название | Статус | Примечание |
 | ---- | -------- | ------ | ---------- |
 | 00 | Genesis | DONE (документы закоммичены: `f60350a`) | Идентичность, исследование, независимое ревью, Epoch II Roadmap. Hygiene — частично (см. Phase 01) |
-| 01 | Engineering Consolidation | ENGINEERING BASELINE COMPLETE (2026-11-27) | `main` @ `030c45d`: 1364 passed, 0 skipped на PostgreSQL 16; API-004 HTTP slice и EVAL-001 интегрированы. Открыто: сверка MIS-0005 (не блокер) |
+| 01 | Engineering Consolidation | ENGINEERING BASELINE COMPLETE; Codebase Organization интегрирована (2026-11-28) | `main` @ `0609905`: 1368 passed, 0 skipped, 0 failed на PostgreSQL 16.16 (отдельный прогон); пакет `supportops_agent` разложен на `runtime/`, `tools/`, `business/` (старые плоские пути импорта не сохранены — внутреннее изменение структуры). Technical Identity Migration — в работе (ветка `refactor/hermes-e2-phase01-tech-identity`). Открыто: сверка MIS-0005 (не блокер) |
 | 02 | Modular Execution Core | PLANNED | Начинать только после Phase 01; гейт — HX-1 (решение владельца) |
 | 03 | Multi-Tenant Orchestration | PLANNED | |
 | 04 | AI Dispatcher | PLANNED | |

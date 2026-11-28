@@ -61,3 +61,5 @@ finalization capsule, `state.json` (MIS-0004 completed) and Git (`78af152` is an
 
 HERMES Epoch II начата; Phase 01 — Engineering Consolidation: инженерная baseline завершена (`main` @ `030c45d`, 1364 passed на PG 16; API-004 HTTP slice и EVAL-001 интегрированы), открыта сверка MIS-0005. Roadmap: `context/maps/roadmap-epoch-2-hermes.md`.
 Невыполнимые governance-операции: `docs/hermes/governance-reconciliation-2026-11-27.md` (G3 — статус SEC-003 — устранён 2026-11-27).
+
+_Обновлено 2026-11-28:_ Codebase Organization (E2-Phase 01) интегрирована в `main` (`0609905`; пакет `supportops_agent` → `runtime/`, `tools/`, `business/`; старые плоские пути импорта не сохранены, публичные HTTP/DB/env-контракты не затронуты). Полный regression на PG 16.16 на `main`: 1368 passed, 0 skipped. Известное ограничение: ранее на baseline и реорганизованной ветке воспроизводилась ошибка `StorageUnavailable` в PG-прогоне (модуль отдельно проходит полностью); в прогоне 2026-11-28 не воспроизвелась. Technical Identity Migration выполняется в отдельном worktree; commit/merge — только по отдельному разрешению.
