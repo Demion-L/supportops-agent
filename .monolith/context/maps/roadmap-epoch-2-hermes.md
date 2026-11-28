@@ -22,9 +22,9 @@ authority: authoritative
 
 | Фаза | Название | Статус | Примечание |
 | ---- | -------- | ------ | ---------- |
-| 00 | Genesis | DONE (документы закоммичены: `f60350a`) | Идентичность, исследование, независимое ревью, Epoch II Roadmap. Hygiene — частично (см. Phase 01) |
-| 01 | Engineering Consolidation | ENGINEERING BASELINE COMPLETE; Codebase Organization интегрирована (2026-11-28) | `main` @ `0609905`: 1368 passed, 0 skipped, 0 failed на PostgreSQL 16.16 (отдельный прогон); пакет `supportops_agent` разложен на `runtime/`, `tools/`, `business/` (старые плоские пути импорта не сохранены — внутреннее изменение структуры). Technical Identity Migration — в работе (ветка `refactor/hermes-e2-phase01-tech-identity`). Открыто: сверка MIS-0005 (не блокер) |
-| 02 | Modular Execution Core | PLANNED | Начинать только после Phase 01; гейт — HX-1 (решение владельца) |
+| 00 | Genesis | COMPLETED (документы закоммичены: `f60350a`) | Идентичность, исследование, независимое ревью, Epoch II Roadmap. Hygiene — частично (см. Phase 01) |
+| 01 | Engineering Consolidation | COMPLETED (2026-11-28) | Repository Consolidation, Security Foundation, API-004 HTTP slice, Evaluation Framework, архив Agent Commons, Codebase Organization, Technical Identity Migration (`docs/hermes/11-technical-identity-migration.md`), верифицированная baseline: полный regression на PostgreSQL 16.16 — 1376 passed, 0 failed, 0 skipped (прогон дерева worktree; исполняемый код, тесты и конфигурация `main` идентичны — проверено `git diff`). Открытые ограничения: сверка MIS-0005 / Tactical Coordinatorium (governance, не блокер), нестабильная `StorageUnavailable` на PG (не воспроизводилась в двух последних полных прогонах), старые плоские пути импорта и `supportops_service` не сохранены |
+| 02 | Modular Execution Core | READY TO START | Phase 01 завершена; гейт — HX-1 (решение владельца) сохраняется. Не начата |
 | 03 | Multi-Tenant Orchestration | PLANNED | |
 | 04 | AI Dispatcher | PLANNED | |
 | 05 | Communication & Integration | PLANNED | Email — высокий внешний риск, не в первый эксперимент |
