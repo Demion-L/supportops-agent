@@ -2,8 +2,8 @@ import hashlib
 import json
 
 import pytest
-from supportops_service import ids
-from supportops_service.repositories import _inputs
+from hermes_service import ids
+from hermes_service.repositories import _inputs
 
 
 def test_ids_match_db_check_format_and_are_unique():

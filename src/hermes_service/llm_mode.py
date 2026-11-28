@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from supportops_service.config import ServiceConfigurationError, ServiceSettings
+from hermes_service.config import ServiceConfigurationError, ServiceSettings
 
 
 class LlmMode(StrEnum):

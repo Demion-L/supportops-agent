@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-SRC = Path(__file__).resolve().parents[2] / "src" / "supportops_service"
+SRC = Path(__file__).resolve().parents[2] / "src" / "hermes_service"
 FILES = [SRC / "ids.py", *sorted((SRC / "repositories").glob("*.py"))]
 FORBIDDEN_IMPORTS = {"supportops_agent", "openai", "httpx", "requests", "urllib", "socket", "subprocess", "http"}
 
@@ -30,7 +30,7 @@ def test_no_agent_llm_or_network_imports(path):  # T12
 
 def test_importing_repositories_loads_no_agent_or_llm_client():  # T12 (runtime)
     code = (
-        "import sys, supportops_service.repositories.tickets, supportops_service.repositories.fakes;"
+        "import sys, hermes_service.repositories.tickets, hermes_service.repositories.fakes;"
         "bad=[m for m in ('supportops_agent','openai') if m in sys.modules];"
         "assert not bad, bad"
     )

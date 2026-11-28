@@ -20,15 +20,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from supportops_service.db.errors import (
+from hermes_service.db.errors import (
     IdempotencyConflict,
     InvalidRepositoryInput,
     StorageFailure,
     StorageUnavailable,
 )
-from supportops_service.middleware import REQUEST_ID_HEADER, get_request_id
+from hermes_service.middleware import REQUEST_ID_HEADER, get_request_id
 
-logger = logging.getLogger("supportops_service")
+logger = logging.getLogger("hermes_service")
 
 _FIXED: Final[dict[int, tuple[str, str]]] = {
     400: ("bad_request", "The request is invalid."),

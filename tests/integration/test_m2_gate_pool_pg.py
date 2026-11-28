@@ -14,11 +14,11 @@ import httpx
 import pytest
 from test_alpha_beta_integration_pg import PEPPER, SETTINGS, bearer, issue, make_router
 
-from supportops_service.app import create_app
-from supportops_service.config import ServiceConfigurationError
-from supportops_service.repositories.credentials import PostgresCredentialRepository
-from supportops_service.repositories.tickets import PgTicketRepository
-from supportops_service.security.credentials import generate_api_key
+from hermes_service.app import create_app
+from hermes_service.config import ServiceConfigurationError
+from hermes_service.repositories.credentials import PostgresCredentialRepository
+from hermes_service.repositories.tickets import PgTicketRepository
+from hermes_service.security.credentials import generate_api_key
 
 pytestmark = pytest.mark.postgres
 

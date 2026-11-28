@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 from conftest import PEPPER, bearer
 
-from supportops_service.security.credentials import (
+from hermes_service.security.credentials import (
     PepperSet,
     compute_key_hash,
     generate_api_key,
 )
-from supportops_service.security.errors import Unauthenticated
+from hermes_service.security.errors import Unauthenticated
 
 
 def _secrets_of(issued, env):
@@ -90,7 +90,7 @@ def test_unhandled_error_in_handler_does_not_leak(client, env, app):
     marker = "SECRET-MARKER-HANDLER-77"
     from fastapi import Depends
 
-    from supportops_service.security.dependencies import authenticate
+    from hermes_service.security.dependencies import authenticate
 
     @app.get("/v1/boom")
     def boom(ctx=Depends(authenticate)):

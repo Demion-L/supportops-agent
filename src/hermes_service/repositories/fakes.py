@@ -12,10 +12,10 @@ import threading
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
-from supportops_service.db.errors import IdempotencyConflict, StorageFailure, StorageUnavailable
-from supportops_service.ids import is_ticket_id, new_run_id, new_ticket_id
-from supportops_service.repositories import _inputs
-from supportops_service.repositories.protocols import CreateResult, TicketView
+from hermes_service.db.errors import IdempotencyConflict, StorageFailure, StorageUnavailable
+from hermes_service.ids import is_ticket_id, new_run_id, new_ticket_id
+from hermes_service.repositories import _inputs
+from hermes_service.repositories.protocols import CreateResult, TicketView
 
 
 @dataclass

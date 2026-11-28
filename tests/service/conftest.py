@@ -3,8 +3,8 @@ import socket
 import pytest
 from fastapi.testclient import TestClient
 
-from supportops_service.app import create_app
-from supportops_service.config import ServiceSettings
+from hermes_service.app import create_app
+from hermes_service.config import ServiceSettings
 
 
 @pytest.fixture(autouse=True)

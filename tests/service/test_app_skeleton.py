@@ -4,8 +4,8 @@ import textwrap
 
 from fastapi import FastAPI
 
-from supportops_service.app import create_app
-from supportops_service.config import ServiceSettings
+from hermes_service.app import create_app
+from hermes_service.config import ServiceSettings
 
 _NO_NET = textwrap.dedent(
     """
@@ -14,8 +14,8 @@ _NO_NET = textwrap.dedent(
         raise AssertionError("network")
     socket.socket.connect = blocked
     socket.create_connection = blocked
-    import supportops_service.app
-    import supportops_service
+    import hermes_service.app
+    import hermes_service
     {extra}
     """
 )
@@ -37,7 +37,7 @@ def test_import_has_no_network_or_env_side_effects():
 
 def test_import_and_create_app_do_not_load_agent_or_llm_client():
     result = _run(
-        "from supportops_service.app import create_app\n"
+        "from hermes_service.app import create_app\n"
         "create_app()\n"
         "assert 'supportops_agent' not in sys.modules\n"
         "assert 'openai' not in sys.modules\n"
@@ -116,9 +116,9 @@ def test_support_agent_is_never_invoked(monkeypatch, client):
 def test_service_package_does_not_import_agent_sources():
     import pathlib
 
-    import supportops_service
+    import hermes_service
 
-    root = pathlib.Path(supportops_service.__file__).parent
+    root = pathlib.Path(hermes_service.__file__).parent
     for path in root.rglob("*.py"):
         text = path.read_text()
         assert "supportops_agent" not in text.replace("``supportops_agent``", ""), path

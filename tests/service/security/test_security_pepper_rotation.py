@@ -9,12 +9,12 @@ import sys
 import pytest
 from conftest import PEPPER, PEPPER_2, bearer
 
-from supportops_service.security.credentials import (
+from hermes_service.security.credentials import (
     CredentialVerifier,
     PepperSet,
     compute_key_hash,
 )
-from supportops_service.security.errors import Unauthenticated
+from hermes_service.security.errors import Unauthenticated
 
 PEPPER_3 = b"synthetic-pepper-0123456789abcdef-C"
 
@@ -143,8 +143,8 @@ def test_importing_security_package_reads_no_application_configuration():
         "    def get(s, k, d=None): seen.append(k); return dict.get(s, k, d)\n"
         "    def __contains__(s, k): seen.append(k); return dict.__contains__(s, k)\n"
         "os.environ = E(os.environ)\n"
-        "import supportops_service.security.credentials, supportops_service.security.dependencies\n"
-        "import supportops_service.security.route_audit, supportops_service.repositories.credentials\n"
+        "import hermes_service.security.credentials, hermes_service.security.dependencies\n"
+        "import hermes_service.security.route_audit, hermes_service.repositories.credentials\n"
         "bad = [k for k in seen if k.upper().startswith(('SUPPORTOPS', 'PEPPER', 'DATABASE', 'PG'))]\n"
         "sys.exit(1 if bad else 0)\n"
     )

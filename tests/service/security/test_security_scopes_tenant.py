@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from conftest import bearer
 
-from supportops_service.interfaces import Scope
-from supportops_service.security.tenant_context import build_tenant_context, filter_scopes
+from hermes_service.interfaces import Scope
+from hermes_service.security.tenant_context import build_tenant_context, filter_scopes
 
 RID = {"X-Request-ID": "fixed-request-id-2"}
 
@@ -51,7 +51,7 @@ def test_trace_scope_is_separate(client, env):
 
 
 def test_require_scope_rejects_non_scope_at_wiring_time():
-    from supportops_service.security.dependencies import require_scope
+    from hermes_service.security.dependencies import require_scope
 
     with pytest.raises(ValueError):
         require_scope("tickets:everything")  # type: ignore[arg-type]
@@ -168,7 +168,7 @@ def test_unsecured_route_keeps_safe_behavior_with_documented_error_ordering(clie
 # tenant context factory ----------------------------------------------------------------------
 @pytest.mark.parametrize("bad", ["", "A", "-a", "a_b", "a" * 64, "a b", "a\n", None, 5, "é"])
 def test_invalid_tenant_ids_do_not_build_a_context(bad):
-    from supportops_service.security.tenant_context import TenantContextError
+    from hermes_service.security.tenant_context import TenantContextError
 
     with pytest.raises(TenantContextError):
         build_tenant_context(tenant_id=bad, credential_id="cred-1", raw_scopes=[])

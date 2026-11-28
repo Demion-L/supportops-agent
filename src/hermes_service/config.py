@@ -8,19 +8,46 @@ values.
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Mapping
 from typing import Final
 
 from pydantic import BaseModel, ConfigDict, SecretStr
 
-ENV_PREFIX: Final = "SUPPORTOPS_"
+ENV_PREFIX: Final = "HERMES_"
+# Pre-HERMES prefix, still honoured (deprecated) so existing deployments and secrets keep working.
+LEGACY_ENV_PREFIX: Final = "SUPPORTOPS_"
+logger = logging.getLogger("hermes_service.config")
 _TRUE: Final = frozenset({"1", "true", "yes", "on"})
 _FALSE: Final = frozenset({"0", "false", "no", "off"})
 
 
 class ServiceConfigurationError(RuntimeError):
     """Raised when the service cannot be safely configured. Message is fixed text."""
+
+
+def read_env(source: Mapping[str, str], name: str) -> str | None:
+    """Read ``HERMES_<name>`` with a deprecated ``SUPPORTOPS_<name>`` fallback.
+
+    Blank values count as unset. If both variables carry a value and the values differ the
+    configuration is ambiguous and fails closed (important for secrets such as the pepper:
+    silently picking one would invalidate or mis-sign credentials). Values are never echoed.
+    """
+    current = source.get(f"{ENV_PREFIX}{name}")
+    legacy = source.get(f"{LEGACY_ENV_PREFIX}{name}")
+    current = current if current is not None and current.strip() else None
+    legacy = legacy if legacy is not None and legacy.strip() else None
+    if legacy is not None:
+        if current is not None and current.strip() != legacy.strip():
+            raise ServiceConfigurationError(
+                f"Conflicting values for {ENV_PREFIX}{name} and {LEGACY_ENV_PREFIX}{name}."
+            )
+        logger.warning(
+            "Deprecated environment variable %s%s; use %s%s.",
+            LEGACY_ENV_PREFIX, name, ENV_PREFIX, name,
+        )
+    return current if current is not None else legacy
 
 
 def _parse_bool(raw: str | None, *, default: bool, name: str) -> bool:
@@ -56,7 +83,7 @@ class ServiceSettings(BaseModel):
         source = os.environ if env is None else env
 
         def get(name: str) -> str | None:
-            return source.get(f"{ENV_PREFIX}{name}")
+            return read_env(source, name)
 
         demo_mode = _parse_bool(get("DEMO_MODE"), default=True, name="DEMO_MODE")
         docs_enabled = _parse_bool(get("DOCS_ENABLED"), default=False, name="DOCS_ENABLED")

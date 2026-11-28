@@ -75,7 +75,7 @@ def test_no_code_execution_network_or_monolith_runtime_dependency():  # S4 + Ð¸Ð
             if isinstance(n, ast.ImportFrom):
                 assert (n.module or "").split(".")[0] not in banned_modules, f.name
         text = f.read_text().lower()
-        assert not re.search(r"^\s*(from|import)\s+.*(monolith|supportops)", text, re.M), f.name
+        assert not re.search(r"^\s*(from|import)\s+.*(monolith|supportops|hermes)", text, re.M), f.name
 
 
 def test_recommendation_is_inert_data_never_executed():
@@ -86,4 +86,5 @@ def test_recommendation_is_inert_data_never_executed():
 
 def test_no_production_supportops_import():
     import sys
-    assert not any(m == "supportops_agent" or m.startswith("supportops_agent.") for m in sys.modules)
+    forbidden = ("supportops_agent", "hermes_service")
+    assert not any(m == f or m.startswith(f + ".") for m in sys.modules for f in forbidden)

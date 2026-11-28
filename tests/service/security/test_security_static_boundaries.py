@@ -5,11 +5,11 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import supportops_service
-from supportops_service import interfaces
-from supportops_service.security import tenant_context
+import hermes_service
+from hermes_service import interfaces
+from hermes_service.security import tenant_context
 
-SRC = Path(supportops_service.__file__).parent
+SRC = Path(hermes_service.__file__).parent
 SECURITY = SRC / "security"
 SECRET_NAMES = ("secret", "key_hash", "digest", "computed", "pepper", "token")
 
@@ -71,7 +71,7 @@ def test_only_the_authorization_header_is_read():
 def test_agent_package_does_not_import_service_security():
     agent_src = SRC.parent / "supportops_agent"
     for p in _py(agent_src):
-        assert "supportops_service" not in p.read_text(), p
+        assert "hermes_service" not in p.read_text(), p
 
 
 def test_credential_repository_is_confined_to_authentication_code():

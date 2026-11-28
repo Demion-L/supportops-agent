@@ -17,14 +17,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from supportops_service.db.errors import (
+from hermes_service.db.errors import (
     MigrationChecksumMismatch,
     MigrationError,
     MigrationSetError,
 )
-from supportops_service.db.pool import DatabasePool
+from hermes_service.db.pool import DatabasePool
 
-logger = logging.getLogger("supportops_service.db.migrate")
+logger = logging.getLogger("hermes_service.db.migrate")
 
 DEFAULT_MIGRATIONS_DIR: Final = Path(__file__).parent / "migrations"
 # Arbitrary fixed 63-bit key for pg_advisory_xact_lock ("SPOPMIGR").

@@ -8,6 +8,7 @@ Tool authorization (Gate) разрешает ИСПОЛЬЗОВАТЬ инстр
 """
 
 import json
+import re
 
 import pytest
 from pydantic import ConfigDict
@@ -381,6 +382,11 @@ def test_foreign_data_absent_from_llm_context_and_trace(name, args):
     assert requested not in trace  # SR-4: значения аргументов в trace не пишутся
     for label, blob in (("llm_context", llm_context), ("trace", trace)):
         residue = blob.replace(requested, "<ECHO>")
+        # Случайные значения (длительности, метки времени, UUID) могут содержать цифровой
+        # маркер (например "4999" в 0.034999999999999996 или в сегменте UUID) — это не данные клиента.
+        residue = re.sub(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", "<UUID>", residue)
+        residue = re.sub(r'"duration_ms":\s*[-0-9.eE+]+', '"duration_ms":0', residue)
+        residue = re.sub(r'"(started_at|finished_at)":\s*"[^"]*"', r'"\1":""', residue)
         leaked = [m for m in FOREIGN_DATA if m in residue]
         assert leaked == [], f"{label}: {leaked}"
 

@@ -16,20 +16,20 @@ import pytest
 from fastapi import Depends
 from fastapi.testclient import TestClient
 
-from supportops_service.interfaces import TenantContext
-from supportops_service.repositories import credentials as repo_module
-from supportops_service.repositories.credentials import (
+from hermes_service.interfaces import TenantContext
+from hermes_service.repositories import credentials as repo_module
+from hermes_service.repositories.credentials import (
     CredentialStoreError,
     PostgresCredentialRepository,
 )
-from supportops_service.interfaces import Scope
-from supportops_service.security.credentials import (
+from hermes_service.interfaces import Scope
+from hermes_service.security.credentials import (
     CredentialVerifier,
     PepperSet,
     compute_key_hash,
     generate_api_key,
 )
-from supportops_service.security.dependencies import install_security, require_scope
+from hermes_service.security.dependencies import install_security, require_scope
 
 from conftest import NOW, PEPPER, FixedClock, bearer
 

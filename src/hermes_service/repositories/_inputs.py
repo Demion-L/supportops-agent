@@ -8,7 +8,7 @@ import json
 import re
 from typing import Final
 
-from supportops_service.db.errors import InvalidRepositoryInput
+from hermes_service.db.errors import InvalidRepositoryInput
 
 TENANT_ID_RE: Final = re.compile(r"[a-z0-9][a-z0-9-]{0,62}")  # == CHECK in migration 0001
 IDEMPOTENCY_KEY_RE: Final = re.compile(r"[A-Za-z0-9._:-]{8,100}")

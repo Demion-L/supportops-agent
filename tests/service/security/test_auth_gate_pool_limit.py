@@ -17,12 +17,12 @@ import httpx
 import pytest
 from fastapi import APIRouter, Depends
 
-from supportops_service.app import create_app
-from supportops_service.config import ServiceConfigurationError, ServiceSettings
-from supportops_service.interfaces import Scope, TenantContext
-from supportops_service.repositories.credentials import PostgresCredentialRepository
-from supportops_service.security.credentials import generate_api_key
-from supportops_service.security.dependencies import (
+from hermes_service.app import create_app
+from hermes_service.config import ServiceConfigurationError, ServiceSettings
+from hermes_service.interfaces import Scope, TenantContext
+from hermes_service.repositories.credentials import PostgresCredentialRepository
+from hermes_service.security.credentials import generate_api_key
+from hermes_service.security.dependencies import (
     DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS,
     AuthenticationGate,
     SecuredRoute,
@@ -81,7 +81,7 @@ def _app(repo, **kwargs):
 
 
 def test_default_limit_is_three_and_below_the_default_pool_of_four():
-    from supportops_service.db.pool import DatabaseSettings
+    from hermes_service.db.pool import DatabaseSettings
 
     assert DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS == 3
     assert DEFAULT_MAX_CONCURRENT_AUTHENTICATIONS < DatabaseSettings.__dataclass_fields__["max_size"].default

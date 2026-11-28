@@ -48,9 +48,18 @@ HERMES **не создан с нуля**. Он наследует весь ин�
 
 Документы Epoch I (`docs/design/`, `docs/security/`, `.monolith/context/`) сохранены без изменений и остаются историческим источником истины для эпохи SupportOps.
 
-## Технические идентификаторы (намеренно не менялись)
+## Технические идентификаторы (E2-Phase 01)
 
-Python-пакеты `supportops_agent` и `supportops_service`, префикс переменных окружения `SUPPORTOPS_`, имена таблиц, ветки Git, имя удалённого репозитория — **остаются прежними**. Их миграция — отдельное решение владельца (`docs/hermes/06-technical-identity-migration-plan.md`).
+| Идентификатор | Состояние |
+|---|---|
+| Python-пакет HTTP-сервиса | `supportops_service` → **`hermes_service`** (старый путь импорта не сохранён) |
+| Дистрибутив (`pyproject.toml`, `uv.lock`) | `supportops-agent` → **`hermes`** |
+| Переменные окружения | **`HERMES_*`**; `SUPPORTOPS_*` принимаются как устаревший fallback, при расхождении значений — отказ (fail-closed) |
+| Заголовок OpenAPI, `application_name` PostgreSQL, имена логгеров сервиса | `HERMES Service API`, `hermes-service`, `hermes_service.*` |
+| Python-пакет `supportops_agent` | **сохранён** — предметный домен SupportOps |
+| Таблицы/миграции БД, формат API-ключей, HTTP-контракты, Story/Mission/ADR, GitHub-репозиторий и `origin` | **сохранены** |
+
+Полная карта «до/после» и обоснование — `docs/hermes/11-technical-identity-migration.md`.
 
 ## Экосистема Latysh Development
 

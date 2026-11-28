@@ -56,4 +56,4 @@ def test_dependencies_point_only_downwards():
 
 def test_agent_core_does_not_import_service_layer():
     for path in _files():
-        assert not any(m.split(".")[0] == "supportops_service" for m in _imports(path)), path
+        assert not any(m.split(".")[0] == "hermes_service" for m in _imports(path)), path

@@ -1,6 +1,6 @@
 """Validated factory for ``TenantContext``.
 
-The type itself is defined once, in ``supportops_service.interfaces``. This module only builds
+The type itself is defined once, in ``hermes_service.interfaces``. This module only builds
 instances from already-verified credential data and fails closed on anything malformed.
 It is called from the authentication layer and nowhere else (enforced by a static test).
 """
@@ -11,7 +11,7 @@ import re
 from collections.abc import Iterable
 from typing import Final
 
-from supportops_service.interfaces import Scope, TenantContext
+from hermes_service.interfaces import Scope, TenantContext
 
 _TENANT_ID: Final = re.compile(r"[a-z0-9][a-z0-9-]{0,62}")
 _CREDENTIAL_ID: Final = re.compile(r"[A-Za-z0-9_.:-]{1,128}")

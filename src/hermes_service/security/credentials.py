@@ -19,13 +19,13 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Final
 
-from supportops_service.interfaces import Clock, CredentialRepository, TenantContext
-from supportops_service.security.errors import (
+from hermes_service.interfaces import Clock, CredentialRepository, TenantContext
+from hermes_service.security.errors import (
     AuthenticationUnavailable,
     DenyReason,
     Unauthenticated,
 )
-from supportops_service.security.tenant_context import TenantContextError, build_tenant_context
+from hermes_service.security.tenant_context import TenantContextError, build_tenant_context
 
 KEY_VERSION: Final = "sok1"
 MAX_HEADER_BYTES: Final = 128

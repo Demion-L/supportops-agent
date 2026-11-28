@@ -13,8 +13,8 @@ import psycopg
 import pytest
 from psycopg_pool import PoolClosed, PoolTimeout
 from pydantic import SecretStr
-from supportops_service.db.errors import StorageUnavailable
-from supportops_service.db.pool import DatabasePool, DatabaseSettings
+from hermes_service.db.errors import StorageUnavailable
+from hermes_service.db.pool import DatabasePool, DatabaseSettings
 
 MARKER = "SYNTHETIC_SECRET_MARKER_7f3a9c"
 FIXED = "Storage is unavailable."
@@ -114,8 +114,8 @@ def test_http_layer_has_no_text_path_from_storage_error():
     """The unified handler never reads ``str(exc)``: even if a driver message were present it
     cannot reach the body. (No StorageUnavailable->503 handler exists yet: contract only.)"""
     from fastapi.testclient import TestClient
-    from supportops_service.app import create_app
-    from supportops_service.config import ServiceSettings
+    from hermes_service.app import create_app
+    from hermes_service.config import ServiceSettings
 
     app = create_app(ServiceSettings())
 

@@ -28,11 +28,11 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
-from supportops_service.errors import RequestRejected
-from supportops_service.interfaces import Scope, TenantContext
-from supportops_service.repositories.protocols import TicketRepository
-from supportops_service.schemas import CreateTicketRequest, CreateTicketResponse, TicketResponse
-from supportops_service.security.dependencies import SecuredRoute, require_scope
+from hermes_service.errors import RequestRejected
+from hermes_service.interfaces import Scope, TenantContext
+from hermes_service.repositories.protocols import TicketRepository
+from hermes_service.schemas import CreateTicketRequest, CreateTicketResponse, TicketResponse
+from hermes_service.security.dependencies import SecuredRoute, require_scope
 
 MAX_BODY_BYTES: Final = 16 * 1024
 _IDEMPOTENCY_KEY: Final = re.compile(r"[A-Za-z0-9._:-]{8,100}")

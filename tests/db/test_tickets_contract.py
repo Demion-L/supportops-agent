@@ -11,14 +11,14 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from supportops_service.db.errors import (
+from hermes_service.db.errors import (
     IdempotencyConflict,
     InvalidRepositoryInput,
     StorageFailure,
     StorageUnavailable,
 )
-from supportops_service.repositories.fakes import InMemoryTicketRepository
-from supportops_service.repositories.tickets import PgTicketRepository
+from hermes_service.repositories.fakes import InMemoryTicketRepository
+from hermes_service.repositories.tickets import PgTicketRepository
 from ticket_harness import FakeHarness, PgHarness
 
 A, B = "tenant-a", "tenant-b"

@@ -8,8 +8,8 @@ import sys
 import pytest
 from pydantic import SecretStr
 
-from supportops_service.config import ServiceConfigurationError
-from supportops_service.db.pool import DatabasePool, DatabaseSettings
+from hermes_service.config import ServiceConfigurationError
+from hermes_service.db.pool import DatabasePool, DatabaseSettings
 
 
 @pytest.fixture(autouse=True)
@@ -23,9 +23,9 @@ def forbid_network(monkeypatch):
 
 
 def test_import_modules_does_not_connect():
-    import supportops_service.db as db
-    import supportops_service.db.migrate as migrate
-    import supportops_service.db.pool as pool
+    import hermes_service.db as db
+    import hermes_service.db.migrate as migrate
+    import hermes_service.db.pool as pool
 
     for m in (db, migrate, pool):
         importlib.reload(m)
@@ -37,7 +37,7 @@ def test_import_in_clean_interpreter_has_no_threads_or_sockets():
         "def boom(*a, **k): raise SystemExit('connect at import')\n"
         "socket.socket.connect = boom\n"
         "before = threading.active_count()\n"
-        "import supportops_service.db.pool, supportops_service.db.migrate\n"
+        "import hermes_service.db.pool, hermes_service.db.migrate\n"
         "assert threading.active_count() == before\n"
     )
     r = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True)
@@ -55,7 +55,7 @@ def test_settings_require_dsn():
     with pytest.raises(ServiceConfigurationError):
         DatabaseSettings.from_env({})
     with pytest.raises(ServiceConfigurationError):
-        DatabaseSettings.from_env({"SUPPORTOPS_DATABASE_URL": "   "})
+        DatabaseSettings.from_env({"HERMES_DATABASE_URL": "   "})
 
 
 @pytest.mark.parametrize(
