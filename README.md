@@ -67,6 +67,4 @@ HERMES — один из самостоятельных проектов: MONOLI
 
 ---
 
-И не забудь: при новом открытии терминала активировать окружение:
-
-source .venv/bin/activate
+Before start to work run this: source .venv/bin/activate
